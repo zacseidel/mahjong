@@ -83,7 +83,9 @@ test('danger: jokers are always safe; tiles no candidate needs are safe; needed 
   const report = defenseReport(o);
   assert.equal(report.level(JOKER), 'safe');
   assert.equal(report.level(T('WW')), 'safe', 'no hand on the card uses West');
-  assert.equal(report.level(T('9D')), 'low', 'only low-threat players might need 9s (the shiftable pairs hand)');
+  assert.equal(report.level(T('9D')), 'safe', 'only low-threat players might need 9s, and low threat doesn’t count');
+  assert.equal(report.active, true);
+  assert.equal(defenseReport(obs(NEAR_KONGS, turn())).active, false, 'nobody threatening early on');
   assert.equal(report.level(T('EW')), 'high', 'West-facing threat needs East winds');
   assert.equal(dangerLevel(0), 'safe');
   assert.equal(dangerLevel(0.05), 'low');

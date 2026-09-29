@@ -195,6 +195,50 @@ body.game { height: 100dvh; display: flex; flex-direction: column; overflow: hid
 .review ul { padding-left: 18px; }
 .review li { padding: 3px 0; }
 
+/* Coach box (in the decision panel) */
+.coach { border: 1px solid var(--border); border-left: 4px solid var(--tok-b); border-radius: 8px; padding: 4px 10px 6px; margin: 4px 0 6px; background: var(--surface); }
+.coach-step summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; gap: 6px; font-weight: 600; list-style: none; }
+.coach-step summary::-webkit-details-marker { display: none; }
+.coach-step summary::after { content: "▸"; margin-left: auto; color: var(--muted); }
+.coach-step[open] summary::after { content: "▾"; }
+.coach-step p { margin: 0 0 6px; color: var(--text); font-size: 0.94rem; }
+.coach-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tok-b); }
+.tip-label { color: var(--accent); }
+.coach-tip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; border-top: 1px dashed var(--border); }
+.coach-step:not([open]) + .coach-tip, .coach > .coach-tip:first-child { border-top: 0; }
+.coach-line { flex: 1 1 260px; font-weight: 600; }
+.coach-buttons { display: inline-flex; gap: 6px; }
+.coach-why { margin: 4px 0 2px; color: var(--muted); font-size: 0.92rem; }
+.btn.small { min-height: 44px; padding: 0 12px; font-size: 0.9rem; }
+.btn.is-suggested { box-shadow: 0 0 0 3px var(--ink-gold); animation: pulse 1.2s ease-in-out 3; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ink-gold) 40%, transparent); } }
+
+/* Glossary terms */
+.term {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: help;
+  text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+}
+.term-pop {
+  position: fixed; z-index: 60; max-width: 300px; padding: 10px 12px; border-radius: 10px;
+  background: var(--text); color: var(--bg); font-size: 0.92rem; line-height: 1.4; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+}
+
+/* Hand laid out against a card line */
+.hand-view { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.hv-group { display: inline-flex; gap: 1px; }
+.cell { position: relative; }
+.cell-need { opacity: 0.35; outline: 1.5px dashed var(--muted); outline-offset: -1px; box-shadow: none; }
+.cell-exposed, .cell-exposed-joker { outline: 2px solid var(--tok-b); outline-offset: 0; }
+.cell-badge {
+  position: absolute; right: -3px; top: -5px; font-size: 9px; font-weight: 800; line-height: 13px; min-width: 13px;
+  border-radius: 7px; background: var(--ink-joker); color: #fff; text-align: center;
+}
+.legend { font-size: 0.85rem; color: var(--muted); }
+.legend .tok-g, .legend .tok-r, .legend .tok-b { font-weight: 700; }
+.review { margin-top: 8px; }
+.review-score { padding-left: 18px; margin: 4px 0; }
+.review-diff summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+
 /* Modal content */
 .payments { border-collapse: collapse; width: 100%; margin: 8px 0; }
 .payments th, .payments td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }

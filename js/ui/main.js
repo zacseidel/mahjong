@@ -4,10 +4,10 @@ import { h, mount, button } from './dom.js';
 import { Rack } from './rack.js';
 import { Session } from './session.js';
 import { renderOpponent, renderCenter, renderMyExposures } from './table.js';
-import { renderPrompt } from './prompt.js';
+import { renderPrompt, actionKey } from './prompt.js';
 import { showEndOfHand, showCard, showSettings, showOpponent, openModal, closeModal } from './modals.js';
 import { nameOf, windOf } from './format.js';
-import { loadCards, saveCards, loadSettings, saveSettings, loadLedger, saveLedger } from '../storage.js';
+import { loadCards, saveCards, loadSettings, saveSettings, loadLedger, saveLedger, loadFlags, setFlag } from '../storage.js';
 import { makeRecord, appendRecord } from '../ledger.js';
 import { PRACTICE_ID, getCard, setActive, putCard, importCard, playableHands } from '../cardStore.js';
 
@@ -73,6 +73,7 @@ export const hooks = {
   settingsSections: null, // (settings, onChange) => HTMLElement[]
   onHumanAction: null,  // (obs, action) => void — before the action is applied
   onNewHand: null,      // () => void
+  coach: null,          // (obs, session, ui, rack, rerender) => HTMLElement|null — shown in the decision panel
   getSettings: () => session?.settings,
 };
 
@@ -118,7 +119,13 @@ function render() {
   layout.me.classList.toggle('is-turn', obs.turnSeat === human);
   renderMyExposures(myExposures, obs);
   rack.sync(obs.hand);
+  // "Show me" highlights last only for the decision they were made for.
+  const key = `${obs.log.length}:${obs.decision?.kind ?? ''}`;
+  if (ui.showMe && ui.showMe.key !== key) ui.showMe = null;
   renderPrompt(promptEl, obs, rack, { act: humanAct, ui, rerender: render, thinking });
+  const coachEl = hooks.coach?.(obs, session, ui, rack, render);
+  if (coachEl) promptEl.firstChild ? promptEl.firstChild.after(coachEl) : promptEl.append(coachEl);
+  if (ui.showMe) promptEl.querySelector(`[data-act="${actionKey(ui.showMe.action)}"]`)?.classList.add('is-suggested');
   rack.highlight = new Set();
   rack.marks = new Map();
   hooks.decorate?.(obs, rack, ui);
@@ -238,8 +245,27 @@ function begin(card, cardId = loadCards().activeId) {
   settings = loadSettings();
   session = new Session({ card, settings, onChange: render, onEnd });
   session.cardId = cardId;
+  if (!loadFlags().welcomed) showWelcome();
   buildTopbar();
   session.newHand();
+}
+
+/** First visit: what the game is and how this site teaches it. */
+function showWelcome() {
+  setFlag('welcomed');
+  openModal('Welcome!', [
+    h('p', {}, 'You’re about to play American mah jongg against three computer players. The goal: be first to collect 14 tiles that exactly match one hand on the card.'),
+    h('ul', {},
+      h('li', {}, h('strong', {}, 'The card. '), 'Tap Card at the top any time to see every hand you can make.'),
+      h('li', {}, h('strong', {}, 'The coach. '), 'Above your tiles, “How this works” explains each step, and the Tip suggests a move. Tap Why? for the reason, or Show me to see it on your tiles.'),
+      h('li', {}, h('strong', {}, 'Words. '), 'Underlined words like pung or exposure: tap them for a quick definition.'),
+      h('li', {}, h('strong', {}, 'Tips panel. '), 'Your closest hands, laid out tile by tile, and which of your tiles are risky to throw. On a smaller screen, tap Tips to open it.'),
+      h('li', {}, h('strong', {}, 'After each hand. '), 'See how the hand was won and compare your choices with the tips.')),
+    h('p', {}, 'Your opponents start at Beginner; change them in Settings when you’re ready. New to the game? The ', h('a', { href: 'learn.html' }, 'Learn page'), ' takes about ten minutes.'),
+    h('div', { class: 'modal-actions' },
+      h('a', { class: 'btn', href: 'learn.html' }, 'Read Learn first'),
+      button('Start playing', closeModal, { variant: 'primary' })),
+  ]);
 }
 
 function buildTopbar() {

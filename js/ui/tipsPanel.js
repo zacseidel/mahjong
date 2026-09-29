@@ -1,10 +1,17 @@
-// Tips side panel, rack decorations, opponent threat badges, and the post-hand discard review.
-// Everything here comes from the human's observation via tips.js and defense.js.
+// Coaching for new players: the coach box in the decision panel ("How this works", the tip,
+// Why?, Show me), the tips side panel, rack decorations, opponent threat badges, glossary
+// terms, and the post-hand learning review. Everything comes from the human's observation via
+// coach.js, tips.js, and defense.js; after the hand ends, the review may show all tiles.
 
 import { h, mount, button } from './dom.js';
-import { tileEl, tileRow } from './tileArt.js';
-import { nameOf, cardLine, tileName } from './format.js';
-import { offenseTips, defenseTips, recommendedDiscard } from '../engine/tips.js';
+import { tileEl } from './tileArt.js';
+import { nameOf, cardLine, tileName, groupName } from './format.js';
+import { richText } from './glossaryUI.js';
+import { explainStep } from '../engine/coach.js';
+import { offenseTips, defenseTips, suggestion, handView, colorLegend } from '../engine/tips.js';
+import { matchHand } from '../engine/card.js';
+import { evaluateHand } from '../engine/evaluator.js';
+import { JOKER, displayName } from '../engine/tiles.js';
 
 const DANGER = {
   safe: { symbol: '✓', label: 'Safe to discard' },
@@ -13,27 +20,85 @@ const DANGER = {
   high: { symbol: '!!', label: 'High danger' },
 };
 const THREAT_TEXT = { none: 'No threat', low: 'Low threat', medium: 'Medium threat', high: 'High threat' };
+const COLOR_WORD = { g: 'green', r: 'red', b: 'blue' };
 
-/** Cache per observation-render so the panel, rack, and badges share one computation. */
-let cache = { key: null, off: null, def: null };
-function compute(obs) {
-  const key = `${obs.seat}|${obs.log.length}|${obs.hand.join(',')}|${obs.decision?.kind}|${obs.phase}`;
+/** One computation per observation, shared by the coach box, panel, rack, and badges. */
+let cache = { key: null };
+function compute(obs, settings) {
+  const key = `${obs.seat}|${obs.log.length}|${obs.hand.join(',')}|${obs.decision?.kind}|${obs.phase}|${settings?.tips.defense}`;
   if (cache.key !== key) {
     const nameOfSeat = (s) => nameOf(s, obs.seat);
     cache = {
       key,
       off: offenseTips(obs, { nameOf: nameOfSeat }),
       def: defenseTips(obs, { nameOf: nameOfSeat }),
+      sug: suggestion(obs, { nameOf: nameOfSeat, defense: settings?.tips.defense ?? true }),
+      step: explainStep(obs, { nameOf: nameOfSeat }),
     };
   }
   return cache;
 }
 
+/** Identifies the current decision, so "Show me" highlights reset when it changes. */
+export function decisionKey(obs) {
+  return `${obs.log.length}:${obs.decision?.kind ?? ''}`;
+}
+
 function tipItem(tip, extra = null) {
+  const seen = new Set();
   return h('details', { class: `tip tip-${tip.kind}` },
-    h('summary', {}, tip.tile !== undefined ? tileEl(tip.tile, { size: 'xs' }) : null, h('span', {}, tip.line)),
-    h('p', {}, tip.detail),
+    h('summary', {}, tip.tile !== undefined ? tileEl(tip.tile, { size: 'xs' }) : null, h('span', {}, richText(tip.line, seen))),
+    h('p', {}, richText(tip.detail, seen)),
     extra);
+}
+
+/** A hand laid out against its card line: held tiles solid, jokers marked, missing tiles faded. */
+export function handViewEl(view) {
+  return h('span', { class: 'hand-view' }, ...view.map((g) => h('span', { class: 'hv-group' },
+    ...g.cells.map((cell) => {
+      const el = tileEl(cell === 'exposed-joker' ? JOKER : g.tile, { size: 'xs', className: `cell cell-${cell}` });
+      if (cell === 'joker') el.append(h('span', { class: 'cell-badge', title: 'A joker you hold fills this' }, 'J'));
+      el.title = cell === 'need' ? `Still needed: ${displayName(g.tile)}` : cell === 'joker' ? `A joker fills this ${displayName(g.tile)}` : displayName(g.tile);
+      return el;
+    }))));
+}
+
+function legendEl(legend) {
+  const entries = Object.entries(legend);
+  if (!entries.length) return null;
+  return h('span', { class: 'legend' }, 'Here: ', ...entries.flatMap(([c, suit], i) => [
+    i ? ', ' : '', h('span', { class: `tok-${c}` }, COLOR_WORD[c]), ` = ${suit}`]));
+}
+
+/** Describe an action in plain words, for the review. */
+function describe(a) {
+  if (!a) return 'no suggestion';
+  switch (a.type) {
+    case 'pass': return `pass ${a.tiles.map(displayName).join(', ') || 'nothing from your hand'}${a.blind ? ` + ${a.blind} blind` : ''}`;
+    case 'courtesyPass': return `give ${a.tiles.map(displayName).join(', ')}`;
+    case 'courtesyRequest': return `ask for ${a.count}`;
+    case 'vote': return a.stop ? 'stop the second Charleston' : 'play the second Charleston';
+    case 'discard': return `discard ${displayName(a.tile)}`;
+    case 'exchange': return 'swap for a joker';
+    case 'mahjong': return 'declare Mah Jongg';
+    case 'declareDead': return 'declare a dead hand';
+    case 'claim': return a.call === 'pass' ? 'pass' : a.call === 'mahjong' ? 'call Mah Jongg' : `call a ${groupName(a.count)}`;
+    default: return a.type;
+  }
+}
+
+const sameTiles = (x = [], y = []) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+function sameAction(a, b) {
+  if (!a || !b || a.type !== b.type) return false;
+  switch (a.type) {
+    case 'pass': return sameTiles(a.tiles, b.tiles) && (a.blind ?? 0) === (b.blind ?? 0);
+    case 'courtesyPass': return sameTiles(a.tiles, b.tiles);
+    case 'courtesyRequest': return a.count === b.count;
+    case 'vote': return a.stop === b.stop;
+    case 'discard': return a.tile === b.tile;
+    case 'claim': return a.call === b.call && (a.call !== 'expose' || a.count === b.count);
+    default: return true;
+  }
 }
 
 /**
@@ -41,7 +106,46 @@ function tipItem(tip, extra = null) {
  * @param {typeof import('./main.js').hooks} hooks
  */
 export function installTips(hooks) {
-  const review = { state: null, entries: [] };
+  const review = { entries: [] };
+
+  /** The coach box inside the decision panel: works on every screen size. */
+  hooks.coach = (obs, session, ui, rack, rerender) => {
+    const s = session.settings;
+    if (obs.phase === 'end') return null;
+    const { step, sug } = compute(obs, s);
+    const showTip = sug && ((sug.kind === 'fold' && s.tips.defense) || (sug.kind !== 'fold' && s.tips.offense));
+    const showStep = s.explain && step;
+    if (!showTip && !showStep) return null;
+    const seen = new Set();
+    const box = h('div', { class: 'coach' });
+    if (showStep) {
+      const details = h('details', { class: 'coach-step', open: ui.stepOpen !== false },
+        h('summary', {}, h('span', { class: 'coach-label' }, 'How this works'), ` ${step.title}`),
+        h('p', {}, richText(step.text, seen)));
+      details.addEventListener('toggle', () => { ui.stepOpen = details.open; });
+      box.append(details);
+    }
+    if (showTip) {
+      const key = decisionKey(obs);
+      const why = h('p', { class: 'coach-why', hidden: ui.whyOpen !== key }, richText(sug.detail, seen));
+      const showMe = () => {
+        const a = sug.action;
+        if (a.type === 'pass') { ui.blind = a.blind ?? 0; rack.selectTiles(a.tiles); }
+        if (a.type === 'courtesyPass') rack.selectTiles(a.tiles);
+        if (a.type === 'discard') rack.selectTiles([a.tile]);
+        ui.showMe = { key, action: a };
+        rerender();
+      };
+      box.append(h('div', { class: 'coach-tip' },
+        h('span', { class: 'coach-label tip-label' }, 'Tip'),
+        h('span', { class: 'coach-line' }, richText(sug.line, seen)),
+        h('span', { class: 'coach-buttons' },
+          button('Why?', () => { ui.whyOpen = ui.whyOpen === key ? null : key; rerender(); }, { variant: 'small' }),
+          button('Show me', showMe, { variant: 'small' }))),
+      why);
+    }
+    return box;
+  };
 
   hooks.renderSide = (el, obs, session, ui, rerender, act) => {
     const tipsOn = session.settings.tips;
@@ -50,10 +154,9 @@ export function installTips(hooks) {
         h('p', { class: 'muted' }, 'Tips are off. Turn them on in Settings.'));
       return;
     }
-    const { off, def } = compute(obs);
+    const { off, def } = compute(obs, session.settings);
     const sections = [h('h2', { class: 'side-title' }, 'Tips')];
 
-    // When folding is advised, the fold tip replaces the offense discard tip (§10.6).
     const folding = tipsOn.defense && def.fold;
     const foldTip = folding ? def.tips.find((t) => t.kind === 'fold') : null;
     if (foldTip) sections.push(h('section', {}, h('h3', {}, 'Suggestion'), tipItem(foldTip)));
@@ -64,7 +167,7 @@ export function installTips(hooks) {
       if (exchangeTips.length) sections.push(h('section', {}, h('h3', {}, 'Joker exchanges'), ...exchangeTips.map((t) => tipItem(t))));
       sections.push(h('section', {},
         h('h3', {}, 'Your closest hands'),
-        h('p', { class: 'muted small' }, 'Tap one to highlight the tiles it uses.'),
+        h('p', { class: 'muted small' }, 'Solid tiles you have; faded tiles you still need; J means a joker you hold fills that spot. Tap a hand to highlight its tiles in your rack.'),
         ...off.closest.map((c) => {
           const on = ui.highlightHand === c.handId;
           return h('button', {
@@ -76,9 +179,11 @@ export function installTips(hooks) {
           h('span', { class: 'closest-top' },
             h('span', { class: 'closest-cat' }, c.hand.category),
             h('span', { class: 'closest-dist' }, c.distance === 0 ? 'Complete!' : `${c.distance} away`),
-            h('span', { class: 'closest-val' }, `${c.value}${c.concealed ? ' C' : ''}`)),
+            h('span', { class: 'closest-val' }, `${c.value} ${c.concealed ? 'C' : 'X'}`)),
           cardLine(c.hand.line),
-          c.needed.length ? h('span', { class: 'closest-need' }, 'Needs ', tileRow(c.needed.slice(0, 8), { size: 'xs' }), c.needed.length > 8 ? ' …' : '') : null);
+          handViewEl(c.view),
+          legendEl(c.legend),
+          c.concealed ? h('span', { class: 'muted small' }, 'Concealed: build it without calling discards (except the winning tile).') : null);
         })));
     }
 
@@ -92,7 +197,9 @@ export function installTips(hooks) {
           h('span', { class: `threat threat-${o.threat}` }, THREAT_TEXT[o.threat]),
           ` ${nameOf(o.seat, obs.seat)}: `,
           h('span', { class: 'muted' }, obs.dead[o.seat] ? 'dead hand' : `${o.hands.length} possible hand${o.hands.length === 1 ? '' : 's'} on your card`)))),
-        h('p', { class: 'muted small' }, 'Marks on your tiles: ✓ safe, · low, ! medium, !! high danger of feeding someone’s hand. Tap an opponent’s name to see what they might be building.')));
+        h('p', { class: 'muted small' }, richText(def.report.active
+          ? 'Marks on your tiles show the danger of feeding a threatening player’s hand: ✓ safe, · low, ! medium, !! high. Tap an opponent’s name to see what they might be building.'
+          : 'Nobody looks close to winning yet, so no tile is especially dangerous. Threat rises when players make exposures and late in the wall; then marks appear on your tiles.'))));
     }
     if (obs.phase === 'end') sections.push(h('p', { class: 'muted' }, 'Hand over.'));
     mount(el, ...sections);
@@ -102,13 +209,14 @@ export function installTips(hooks) {
     const settings = hooks.getSettings?.();
     const tipsOn = settings?.tips ?? { offense: true, defense: true };
     if (obs.phase === 'end') return;
-    const { off, def } = compute(obs);
+    const { off, def } = compute(obs, settings);
     if (tipsOn.offense && ui.highlightHand) {
       const c = off.closest.find((x) => x.handId === ui.highlightHand);
       if (c) rack.highlight = new Set(c.uses);
       else ui.highlightHand = null;
     }
-    if (tipsOn.defense && (obs.phase === 'turn' || obs.phase === 'claim')) {
+    // Danger marks only once someone is a real threat (medium or high).
+    if (tipsOn.defense && (obs.phase === 'turn' || obs.phase === 'claim') && def.report.active) {
       for (const t of new Set(obs.hand)) {
         const level = def.report.level(t);
         rack.marks.set(t, { level, ...DANGER[level] });
@@ -119,20 +227,20 @@ export function installTips(hooks) {
   hooks.opponentBadges = (obs, seat) => {
     const settings = hooks.getSettings?.();
     if (!settings?.tips.defense || obs.phase === 'charleston' || obs.phase === 'end') return [];
-    const o = compute(obs).def.report.opponents.find((x) => x.seat === seat);
+    const o = compute(obs, settings).def.report.opponents.find((x) => x.seat === seat);
     return o ? [h('span', { class: `threat threat-${o.threat}` }, THREAT_TEXT[o.threat])] : [];
   };
 
   hooks.opponentExtra = (obs, seat) => {
     if (obs.phase === 'charleston') return null;
-    const o = compute(obs).def.report.opponents.find((x) => x.seat === seat);
+    const o = compute(obs, hooks.getSettings?.()).def.report.opponents.find((x) => x.seat === seat);
     if (!o || obs.dead[seat]) return null;
     const exposed = obs.exposures[seat].length > 0;
     return h('section', {},
       h('h3', {}, `Consistent with ${o.hands.length} hand${o.hands.length === 1 ? '' : 's'} on your card`),
-      h('p', { class: 'muted small' }, exposed
-        ? 'Only hands their exposures fit, so no concealed hands. Hands they seem to be avoiding (tiles they passed you or threw) rank lower.'
-        : 'No exposures yet, so almost anything is possible. Hands they seem to be avoiding rank lower.'),
+      h('p', { class: 'muted small' }, richText(exposed
+        ? 'Only hands their exposures fit, so no concealed hands. Hands they seem to be avoiding (tiles they passed you or threw) rank lower. Reading exposures like this is how you avoid feeding a winning tile.'
+        : 'No exposures yet, so almost anything is possible. Hands they seem to be avoiding (tiles they passed you or threw) rank lower.')),
       h('ol', { class: 'cands' }, ...o.hands.slice(0, 12).map((c) => h('li', {},
         h('span', { class: 'bar', style: `--w:${Math.max(0.05, c.weight / o.hands[0].weight)}` }),
         h('span', { class: 'cat' }, c.hand.category), ' ', cardLine(c.hand.line)))),
@@ -140,10 +248,11 @@ export function installTips(hooks) {
   };
 
   hooks.onHumanAction = (obs, action) => {
-    if (action.type !== 'discard') return;
-    const rec = recommendedDiscard(obs);
-    const fold = defenseTips(obs).fold;
-    review.entries.push({ turn: obs.turnNumber, chosen: action.tile, recommended: rec, fold: fold ? fold.tile : null });
+    const settings = hooks.getSettings?.();
+    const s = suggestion(obs, { defense: settings?.tips.defense ?? true });
+    const fold = obs.decision?.kind === 'turn' ? defenseTips(obs).fold : null;
+    if (action.type === 'exchange' || action.type === 'declareDead') return; // extras, not the decision itself
+    review.entries.push({ kind: obs.decision?.kind, chosen: action, suggested: s?.action ?? null, line: s?.line ?? '', fold: fold ? fold.tile : null });
   };
 
   hooks.onNewHand = () => {
@@ -153,24 +262,70 @@ export function installTips(hooks) {
   /** For the ledger: how often the fold suggestion came up this hand, and was followed. */
   hooks.handReport = () => {
     const folds = review.entries.filter((e) => e.fold !== null);
-    return { fold: { suggested: folds.length, followed: folds.filter((e) => e.chosen === e.fold).length } };
+    return { fold: { suggested: folds.length, followed: folds.filter((e) => e.chosen.type === 'discard' && e.chosen.tile === e.fold).length } };
   };
 
-  hooks.endExtra = () => {
-    const differed = review.entries.filter((e) => e.recommended !== null && e.recommended !== e.chosen);
-    if (!review.entries.length) return null;
-    return h('section', { class: 'review' },
-      h('h3', {}, 'Your discards vs. the tips'),
-      differed.length
-        ? h('ul', {}, ...differed.map((e) => h('li', {},
-          `Your discard ${review.entries.indexOf(e) + 1}: you threw `, tileEl(e.chosen, { size: 'xs' }), ` ${tileName(e.chosen)}; the tip suggested `,
-          tileEl(e.recommended, { size: 'xs' }), ` ${tileName(e.recommended)}.`)))
-        : h('p', {}, `All ${review.entries.length} of your discards matched the tips.`),
-      differed.length ? h('p', { class: 'muted small' }, `${review.entries.length - differed.length} of ${review.entries.length} matched. Tips aren’t always right; they’re a second opinion.`) : null);
+  /** Post-hand learning review: how the hand was won, your closest hand, and choices vs. tips. */
+  hooks.endExtra = (record, session) => {
+    const state = session.state;
+    const r = record.result;
+    const human = record.human;
+    const parts = [];
+
+    if (r.winner !== null) {
+      const p = state.players[r.winner];
+      const match = matchHand(state.card, p).find((m) => m.target.handId === r.handId);
+      if (match) {
+        parts.push(h('section', { class: 'review' },
+          h('h3', {}, r.winner === human ? 'Your winning hand' : 'How the hand was won'),
+          h('p', {}, cardLine(match.target.hand.line), ' ', legendEl(colorLegend(match.target))),
+          handViewEl(handView(match.target, p.concealed, p.exposures)),
+          h('p', { class: 'muted small' }, 'Each group lines up with the card: same color, same suit. Jokers appear only in groups of 3 or more.')));
+      }
+    }
+
+    if (r.winner !== human) {
+      const me = state.players[human];
+      const evals = evaluateHand(me, state.card);
+      const best = evals.find((e) => !e.dead) ?? evals[0];
+      if (best) {
+        parts.push(h('section', { class: 'review' },
+          h('h3', {}, 'Your closest hand at the end'),
+          h('p', {}, h('strong', {}, best.target.hand.category), ' ', cardLine(best.target.hand.line), ` — ${best.distance} away. `, legendEl(colorLegend(best.target))),
+          handViewEl(handView(best.target, me.concealed, me.exposures))));
+      }
+    }
+
+    const decided = review.entries.filter((e) => e.suggested);
+    if (decided.length) {
+      const differed = decided.filter((e) => !sameAction(e.chosen, e.suggested));
+      const byKind = (k) => decided.filter((e) => e.kind === k);
+      const score = (k, label) => {
+        const all = byKind(k);
+        if (!all.length) return null;
+        const ok = all.filter((e) => sameAction(e.chosen, e.suggested)).length;
+        return h('li', {}, `${label}: ${ok} of ${all.length} matched the tips`);
+      };
+      parts.push(h('section', { class: 'review' },
+        h('h3', {}, 'Your choices vs. the tips'),
+        h('ul', { class: 'review-score' },
+          score('pass', 'Charleston passes'), score('vote', 'Second-Charleston vote'),
+          score('courtesyRequest', 'Courtesy pass'), score('claim', 'Calls'), score('turn', 'Discards')),
+        differed.length ? h('details', { class: 'review-diff' },
+          h('summary', {}, `See the ${differed.length} that differed`),
+          h('ul', {}, ...differed.map((e) => h('li', {},
+            h('span', {}, `You chose to ${describe(e.chosen)}; the tip said ${describe(e.suggested)}.`),
+            e.line ? h('span', { class: 'muted small' }, ` (${e.line})`) : null)))) : h('p', {}, 'Every choice matched the tips. Nice!'),
+        h('p', { class: 'muted small' }, 'Tips aren’t always right; they’re a second opinion. Try the same tiles again with Replay this deal.')));
+    }
+    return parts.length ? h('div', {}, ...parts) : null;
   };
 
   hooks.settingsSections = (settings, onChange) => [h('section', {},
-    h('h3', {}, 'Tips'),
+    h('h3', {}, 'Learning'),
+    h('label', { class: 'check' },
+      h('input', { type: 'checkbox', checked: settings.explain, onchange: (e) => { settings.explain = e.target.checked; onChange(); } }),
+      'Explain each step (“How this works”)'),
     h('label', { class: 'check' },
       h('input', { type: 'checkbox', checked: settings.tips.offense, onchange: (e) => { settings.tips.offense = e.target.checked; settings.tipsChosen = true; onChange(); } }),
       'Offense tips: closest hands, what to pass, discard, and call'),

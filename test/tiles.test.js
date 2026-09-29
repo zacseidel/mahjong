@@ -98,7 +98,7 @@ test('displayName', () => {
   assert.equal(displayName(numberTile(CRAK, 3)), '3 Crak');
   assert.equal(displayName(numberTile(BAM, 7)), '7 Bam');
   assert.equal(displayName(numberTile(DOT, 1)), '1 Dot');
-  assert.equal(displayName(NORTH_WIND), 'North');
+  assert.equal(displayName(NORTH_WIND), 'North Wind', 'not just “North”, which reads like a direction');
   assert.equal(displayName(GREEN_DRAGON), 'Green Dragon');
   assert.equal(displayName(WHITE_DRAGON), 'Soap');
   assert.equal(displayName(FLOWER), 'Flower');

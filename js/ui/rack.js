@@ -70,6 +70,15 @@ export class Rack {
     this.selected.clear();
   }
 
+  /** Select these tiles (a multiset), e.g. to show a suggested pass or discard. */
+  selectTiles(tiles) {
+    this.selected.clear();
+    for (const t of tiles) {
+      const slot = this.slots.find((x) => x.tile === t && !this.selected.has(x.uid));
+      if (slot) this.selected.add(slot.uid);
+    }
+  }
+
   tap(uid) {
     const slot = this.slots.find((s) => s.uid === uid);
     if (!slot || this.limit === 0) return;

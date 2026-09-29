@@ -9,7 +9,9 @@ import { unseenCounts } from './evaluator.js';
 export const DEFENSE = Object.freeze({
   passedPenalty: 0.3,     // per distinct tile the opponent passed you that the hand needs
   discardedPenalty: 0.7,  // per distinct tile the opponent discarded that the hand needs
-  threatWeight: Object.freeze({ none: 0, low: 0.2, medium: 0.5, high: 1 }),
+  // Only threatening opponents (medium or high) make a tile dangerous (§10.5). Early in a hand
+  // everyone is low threat, and danger marks would only teach fear of ordinary tiles.
+  threatWeight: Object.freeze({ none: 0, low: 0, medium: 0.5, high: 1 }),
   lastQuarter: 25,        // wall count at or below which threat rises a level
   foldWall: 25,           // fold suggestion only when fewer tiles than this remain
   foldDistance: 3,        // ... and your best hand is at least this far away
@@ -133,5 +135,6 @@ export function defenseReport(obs) {
     };
   });
   const scores = dangerScores(opponents);
-  return { opponents, scores, level: (tile) => dangerLevel(scores[tile]) };
+  const active = opponents.some((o) => o.threat === 'medium' || o.threat === 'high');
+  return { opponents, scores, active, level: (tile) => dangerLevel(scores[tile]) };
 }

@@ -34,7 +34,7 @@ const SUIT_LETTERS = ['C', 'B', 'D'];
 const SUIT_NAMES = ['Crak', 'Bam', 'Dot'];
 const HONOR_CODES = { 27: 'NW', 28: 'EW', 29: 'WW', 30: 'SW', 31: 'RD', 32: 'GD', 33: 'WD', 34: 'F', 35: 'J' };
 const HONOR_NAMES = {
-  27: 'North', 28: 'East', 29: 'West', 30: 'South',
+  27: 'North Wind', 28: 'East Wind', 29: 'West Wind', 30: 'South Wind',
   31: 'Red Dragon', 32: 'Green Dragon', 33: 'Soap', 34: 'Flower', 35: 'Joker',
 };
 const CODE_TO_ID = new Map();
@@ -152,7 +152,7 @@ export function formatTiles(ids) {
 }
 
 /**
- * Human-readable name, e.g. "3 Crak", "North", "Soap".
+ * Human-readable name, e.g. "3 Crak", "North Wind", "Soap".
  * @param {number} id @returns {string}
  */
 export function displayName(id) {

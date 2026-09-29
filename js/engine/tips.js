@@ -2,8 +2,8 @@
 // explanations. Works only from the observer's observation. Recommendations use the same
 // weighting as the intermediate AI.
 
-import { JOKER, toCounts, displayName } from './tiles.js';
-import { fitExposures } from './card.js';
+import { JOKER, toCounts, displayName, suitOf, suitForDragon, isNumber, isDragon } from './tiles.js';
+import { fitExposures, compileHand, CardError } from './card.js';
 import {
   evaluateObservation, evaluateTarget, unseenCounts, topTargets, discardCosts, removalCost, neededTiles,
 } from './evaluator.js';
@@ -14,9 +14,70 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const names = (tiles) => tiles.map(displayName).join(', ');
 
 /**
- * @typedef {{kind: string, line: string, detail: string, tiles?: number[], tile?: number}} Tip
- *   `line` is the one-line reason; `detail` the expanded explanation.
+ * @typedef {{kind: string, line: string, detail: string, tiles?: number[], tile?: number, action?: Object}} Tip
+ *   `line` is the one-line reason; `detail` the expanded explanation; `action` the move it
+ *   recommends, in the engine's action format (used for "Show me" and the post-hand review).
  */
+
+const SUIT_NAMES = ['Craks', 'Bams', 'Dots'];
+
+/**
+ * A target laid out group by group, with each tile marked: 'exposed' (in your exposure),
+ * 'exposed-joker', 'have' (in your hand), 'joker' (a joker you hold fills it), or 'need'.
+ * Real tiles fill pairs and singles first, then groups; jokers fill only groups (SPEC §7).
+ * @param {import('./card.js').Target} target
+ * @param {number[]} concealed
+ * @param {import('./card.js').Exposure[]} [exposures]
+ * @returns {{tile: number, count: number, cells: string[]}[]}
+ */
+export function handView(target, concealed, exposures = []) {
+  const slots = target.layout.map(({ tile, count }) => ({ tile, count, cells: Array(count).fill(null) }));
+  const exposedSlots = new Set();
+  for (const e of exposures) {
+    const i = slots.findIndex((x, k) => !exposedSlots.has(k) && x.tile === e.tile && x.count === e.count);
+    if (i < 0) continue;
+    exposedSlots.add(i);
+    slots[i].cells = slots[i].cells.map((_, k) => (k < e.count - e.jokers ? 'exposed' : 'exposed-joker'));
+  }
+  const left = toCounts(concealed);
+  for (const small of [true, false]) {
+    slots.forEach((x, i) => {
+      if (exposedSlots.has(i) || (x.count < 3) !== small) return;
+      x.cells = x.cells.map((c) => (c || (left[x.tile] > 0 ? (left[x.tile]--, 'have') : null)));
+    });
+  }
+  slots.forEach((x, i) => {
+    if (exposedSlots.has(i) || x.count < 3) return;
+    x.cells = x.cells.map((c) => (c || (left[JOKER] > 0 ? (left[JOKER]--, 'joker') : null)));
+  });
+  return slots.map((x) => ({ tile: x.tile, count: x.count, cells: x.cells.map((c) => c ?? 'need') }));
+}
+
+/**
+ * Which suit each printed color stands for in this version of the hand, e.g. {g: 'Bams', r: 'Craks'}.
+ * Returns {} when it can't be worked out (for example an advanced pattern).
+ * @param {import('./card.js').Target} target
+ */
+export function colorLegend(target) {
+  let pattern;
+  try {
+    pattern = compileHand(target.hand);
+  } catch (e) {
+    if (e instanceof CardError) return {};
+    throw e;
+  }
+  const variant = pattern.variants.find((v) => v.slots.length === target.layout.length
+    && v.slots.every((x, i) => x.kind !== 'fixed' || x.tile === target.layout[i].tile));
+  if (!variant) return {};
+  const legend = {};
+  variant.slots.forEach((x, i) => {
+    if (x.kind === 'fixed' || !'grb'.includes(x.suitVar)) return;
+    const tile = target.layout[i].tile;
+    const suit = isNumber(tile) ? suitOf(tile) : isDragon(tile) ? suitForDragon(tile) : null;
+    if (suit !== null) legend[x.suitVar] = SUIT_NAMES[suit];
+  });
+  return legend;
+}
 
 /** Tiles from the hand that a target uses (one entry per copy). */
 function usedTiles(e, hand) {
@@ -52,6 +113,8 @@ export function closestHands(obs, evals = evaluateObservation(obs), n = 3) {
       dead: e.dead,
       needed: neededTiles(e).map((x) => x.tile),
       uses: usedTiles(e, obs.hand),
+      view: handView(e.target, obs.hand, obs.exposures[obs.seat]),
+      legend: colorLegend(e.target),
     });
     if (out.length === n) break;
   }
@@ -114,13 +177,18 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
     if (d.kind === 'pass' && d.blindAllowed && free.length < 3) {
       detail += ` Only ${free.length} of your tiles are truly spare, so a blind pass of ${3 - free.length} is worth considering: you pass on tiles you haven’t seen instead of breaking up useful ones.`;
     }
-    tips.push({ kind: 'charleston', line, detail, tiles: picks.map((p) => p.tile) });
+    const blind = d.kind === 'pass' && d.blindAllowed && free.length < 3 ? 3 - free.length : 0;
+    const action = d.kind === 'pass'
+      ? { type: 'pass', tiles: (blind ? free : picks).map((p) => p.tile), blind }
+      : { type: 'courtesyPass', tiles: picks.map((p) => p.tile) };
+    tips.push({ kind: 'charleston', line, detail, tiles: action.tiles, action });
   }
 
   if (d.kind === 'vote') {
     const stop = best.distance <= 3;
     tips.push({
       kind: 'vote',
+      action: { type: 'vote', stop },
       line: stop ? `Consider stopping: your best hand is only ${plural(best.distance, 'tile')} away.`
         : `Keep going: your best hand is ${plural(best.distance, 'tile')} away, and another Charleston can help.`,
       detail: `Best hand: ${bestText}. The second Charleston swaps nine more tiles. That helps a hand that still needs a lot, and risks breaking up one that is nearly ready.`,
@@ -131,6 +199,7 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
     const free = cheapestTiles(obs, tracked, 3).filter((p) => p.cost === 0).length;
     tips.push({
       kind: 'courtesy',
+      action: { type: 'courtesyRequest', count: free },
       line: `Ask for ${free}: that’s how many tiles you can spare without hurting your closest hands.`,
       detail: 'The courtesy pass trades the smaller number either of you asks for. Asking for more than you can spare means giving away tiles you need.',
     });
@@ -138,7 +207,7 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
 
   if (d.kind === 'turn') {
     if (d.mahJongg) {
-      tips.push({ kind: 'mahjong', line: 'You have Mah Jongg! Declare it.', detail: 'Your 14 tiles match a hand on the card.' });
+      tips.push({ kind: 'mahjong', action: { type: 'mahjong' }, line: 'You have Mah Jongg! Declare it.', detail: 'Your 14 tiles match a hand on the card.' });
     }
     const unseen = unseenCounts(obs);
     const hand = { concealed: obs.hand, exposures: obs.exposures[obs.seat] };
@@ -153,6 +222,7 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
       if (now <= before) {
         tips.push({
           kind: 'exchange', tile: x.tile,
+          action: { type: 'exchange', seat: x.seat, index: x.index },
           line: `Swap your ${displayName(x.tile)} for ${owner} joker.`,
           detail: 'A joker can stand in for any tile in a group of three or more, so it is worth more than the tile you give up, which your closest hands don’t need for a pair or single.',
         });
@@ -180,31 +250,38 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
           : ` Next best is ${displayName(next.tile)}, which would set back ${hurt} of your top hands.`;
       }
       if (pick.tile === JOKER) detail += ' Throwing a joker is usually bad; here none of your hands can use it.';
-      tips.push({ kind: 'discard', tile: pick.tile, line, detail });
+      // Feedback on the draw: a tile helps if losing it would set back one of your top hands.
+      if (obs.drawn !== null) {
+        const helped = handsHurt(tracked, obs.hand, obs.drawn);
+        if (obs.drawn === pick.tile) detail = `The ${displayName(obs.drawn)} you just drew doesn’t help, so throw it back. ${detail}`;
+        else if (helped) detail = `Good draw: ${displayName(obs.drawn)} helps ${helped === 1 ? 'one of your top hands' : `${helped} of your top hands`}. ${detail}`;
+      }
+      tips.push({ kind: 'discard', tile: pick.tile, action: { type: 'discard', tile: pick.tile }, line, detail });
     }
   }
 
   if (d.kind === 'claim') {
     const who = nameOf(d.discarder);
     if (d.options.some((o) => o.type === 'mahjong')) {
-      tips.push({ kind: 'call', line: `Call it: ${displayName(d.tile)} completes your hand!`, detail: 'Taking a discard for Mah Jongg is always allowed when it completes a hand on the card.' });
+      tips.push({ kind: 'call', action: { type: 'claim', call: 'mahjong' }, line: `Call it: ${displayName(d.tile)} completes your hand!`, detail: 'Taking a discard for Mah Jongg is always allowed when it completes a hand on the card.' });
     } else {
       const top = tracked[0]?.evaluation;
       const concealedTop = tracked.slice(0, 3).filter((x) => x.evaluation.target.concealed).length;
       const opt = d.options.find((o) => o.type === 'expose' && top && fitExposures(top.target, [...obs.exposures[obs.seat], { tile: o.tile, count: o.count, jokers: 0 }]));
       if (top && (top.target.concealed || concealedTop >= 2)) {
         tips.push({
-          kind: 'call', line: 'Pass: calling commits you to an exposed hand, and your best hands are concealed.',
+          kind: 'call', action: { type: 'claim', call: 'pass' }, line: 'Pass: calling commits you to an exposed hand, and your best hands are concealed.',
           detail: `Best hand: ${top.target.hand.line} (concealed). Any exposure rules out every concealed hand on the card.`,
         });
       } else if (opt) {
         tips.push({
-          kind: 'call', line: `Call it: a ${GROUP[opt.count]} of ${displayName(d.tile)} fits your best hand.`,
+          kind: 'call', action: { type: 'claim', call: 'expose', count: opt.count, jokers: opt.minJokers },
+          line: `Call it: a ${GROUP[opt.count]} of ${displayName(d.tile)} fits your best hand.`,
           detail: `It brings ${top.target.hand.line} one tile closer. The cost: your exposure tells everyone what you’re building, and you can’t switch to a hand it doesn’t fit.`,
         });
       } else {
         tips.push({
-          kind: 'call', line: `Pass: this ${displayName(d.tile)} doesn’t fit your best hand.`,
+          kind: 'call', action: { type: 'claim', call: 'pass' }, line: `Pass: this ${displayName(d.tile)} doesn’t fit your best hand.`,
           detail: `Best hand: ${bestText}. An exposure you don’t need locks you out of other hands. ${who} threw it; you can pass.`,
         });
       }
@@ -254,7 +331,7 @@ export function defenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
       const v = threat.hands[0]?.hand.value ?? 25;
       fold = { tile: safest.tile, seat: threat.seat };
       tips.push({
-        kind: 'fold', tile: safest.tile,
+        kind: 'fold', tile: safest.tile, action: { type: 'discard', tile: safest.tile },
         line: `Consider playing defensively: discard ${displayName(safest.tile)}, the safest tile that hurts your hand least.`,
         detail: `Your best hand is ${plural(bestDistance, 'tile')} away with ${obs.wallCount} tiles left, and ${nameOf(threat.seat)} looks close. Throwing ${nameOf(threat.seat)}’s winning tile costs you ${2 * v} instead of ${v}.`,
       });
@@ -282,3 +359,25 @@ export function recommendedDiscard(obs) {
   return fold ? fold.tile : offenseTips(obs).recommendedDiscard;
 }
 
+
+/**
+ * The single move the tips recommend right now, with its reason: Mah Jongg first, then a
+ * helpful joker exchange, then the fold discard when folding is advised, then the offense tip.
+ * @param {import('./observe.js').Observation} obs
+ * @param {{nameOf?: (seat: number) => string, defense?: boolean}} [options]
+ * @returns {{action: Object, line: string, detail: string, kind: string}|null}
+ */
+export function suggestion(obs, { nameOf, defense = true } = {}) {
+  if (!obs.decision) return null;
+  const off = offenseTips(obs, { nameOf });
+  const withAction = off.tips.filter((t) => t.action);
+  const mj = withAction.find((t) => t.action.type === 'mahjong' || t.action.call === 'mahjong');
+  if (mj) return mj;
+  const swap = withAction.find((t) => t.action.type === 'exchange');
+  if (swap) return swap;
+  if (defense && obs.decision.kind === 'turn') {
+    const fold = defenseTips(obs, { nameOf }).tips.find((t) => t.kind === 'fold');
+    if (fold) return fold;
+  }
+  return withAction[0] ?? null;
+}

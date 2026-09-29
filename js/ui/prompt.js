@@ -7,6 +7,21 @@ import { passTarget } from '../engine/charleston.js';
 import { acrossOf } from '../engine/seats.js';
 import { tileEl } from './tileArt.js';
 
+/** A stable key for an action, so the matching button can be highlighted ("Show me"). */
+export function actionKey(a) {
+  if (!a) return '';
+  switch (a.type) {
+    case 'vote': return `vote:${a.stop}`;
+    case 'courtesyRequest': return `courtesy:${a.count}`;
+    case 'claim': return a.call === 'expose' ? `claim:expose:${a.count}` : `claim:${a.call}`;
+    case 'exchange': return `exchange:${a.seat}:${a.index}`;
+    case 'mahjong': return 'mahjong';
+    default: return a.type;
+  }
+}
+
+const tag = (el, action) => { el.dataset.act = actionKey(action); return el; };
+
 /**
  * Render the prompt for the human's pending decision, and set the rack's selection mode.
  * @param {HTMLElement} el
@@ -55,8 +70,8 @@ export function renderPrompt(el, obs, rack, ctx) {
         h('div', { class: 'prompt-title' }, 'First Charleston done. Play the optional second Charleston?'),
         h('div', { class: 'prompt-row' },
           h('span', { class: 'prompt-hint' }, 'Anyone can stop it. Stop if your hand is shaping up well.'),
-          button('Continue', () => ctx.act({ type: 'vote', stop: false }), { variant: 'primary' }),
-          button('Stop', () => ctx.act({ type: 'vote', stop: true }))));
+          tag(button('Continue', () => ctx.act({ type: 'vote', stop: false }), { variant: 'primary' }), { type: 'vote', stop: false }),
+          tag(button('Stop', () => ctx.act({ type: 'vote', stop: true })), { type: 'vote', stop: true })));
       return;
     case 'courtesyRequest':
       rack.setMode(0);
@@ -64,7 +79,7 @@ export function renderPrompt(el, obs, rack, ctx) {
         h('div', { class: 'prompt-title' }, `Courtesy pass with ${nameOf(acrossOf(human), human)} (across): how many tiles?`),
         h('div', { class: 'prompt-row' },
           h('span', { class: 'prompt-hint' }, 'You trade the smaller number either of you asks for.'),
-          ...[0, 1, 2, 3].map((k) => button(String(k), () => ctx.act({ type: 'courtesyRequest', count: k }), { variant: 'primary' }))));
+          ...[0, 1, 2, 3].map((k) => tag(button(String(k), () => ctx.act({ type: 'courtesyRequest', count: k }), { variant: 'primary' }), { type: 'courtesyRequest', count: k }))));
       return;
     case 'courtesyPass': {
       rack.setMode(d.count);
@@ -86,15 +101,15 @@ export function renderPrompt(el, obs, rack, ctx) {
         h('div', { class: 'prompt-row' },
           h('span', { class: 'prompt-hint' }, lead),
           button(sel === undefined ? 'Discard' : `Discard ${tileName(sel)}`, () => ctx.act({ type: 'discard', tile: sel }), { variant: 'primary', disabled: sel === undefined }),
-          button('Mah Jongg!', () => ctx.act({ type: 'mahjong' }), {
+          tag(button('Mah Jongg!', () => ctx.act({ type: 'mahjong' }), {
             variant: d.mahJongg ? 'primary mahjong' : 'mahjong',
             disabled: !d.canDeclareMahJongg,
             title: obs.trainingWheels ? 'Enabled when your hand matches the card' : 'Training wheels off: a false Mah Jongg has a penalty',
-          })),
+          }), { type: 'mahjong' })),
         d.exchanges.length ? h('div', { class: 'prompt-row exchanges' },
           h('span', { class: 'prompt-hint' }, 'Joker exchanges:'),
-          ...d.exchanges.map((x) => button(`Swap your ${tileName(x.tile)} for ${x.seat === human ? 'your' : `${nameOf(x.seat, human)}’s`} joker`,
-            () => ctx.act({ type: 'exchange', seat: x.seat, index: x.index })))) : null,
+          ...d.exchanges.map((x) => tag(button(`Swap your ${tileName(x.tile)} for ${x.seat === human ? 'your' : `${nameOf(x.seat, human)}’s`} joker`,
+            () => ctx.act({ type: 'exchange', seat: x.seat, index: x.index })), { type: 'exchange', seat: x.seat, index: x.index }))) : null,
         d.deadTargets.length ? h('div', { class: 'prompt-row alert' },
           ...d.deadTargets.map((t) => h('span', {}, `${nameOf(t, human)}’s exposures don’t match any hand on your card.`)),
           ...d.deadTargets.map((t) => button(`Declare ${nameOf(t, human)} dead`, () => ctx.act({ type: 'declareDead', target: t })))) : null,
@@ -107,7 +122,7 @@ export function renderPrompt(el, obs, rack, ctx) {
       const buttons = [];
       for (const o of d.options) {
         if (o.type === 'mahjong') {
-          buttons.push(button('Mah Jongg!', () => ctx.act({ type: 'claim', call: 'mahjong' }), { variant: 'primary mahjong' }));
+          buttons.push(tag(button('Mah Jongg!', () => ctx.act({ type: 'claim', call: 'mahjong' }), { variant: 'primary mahjong' }), { type: 'claim', call: 'mahjong' }));
         } else {
           const key = `${o.count}`;
           const jokers = Math.min(o.maxJokers, Math.max(o.minJokers, ui.claimJokers?.[key] ?? o.minJokers));
@@ -118,13 +133,13 @@ export function renderPrompt(el, obs, rack, ctx) {
               button('+', () => { ui.claimJokers = { ...ui.claimJokers, [key]: jokers + 1 }; ctx.rerender(); }, { disabled: jokers >= o.maxJokers }))
             : h('span', { class: 'prompt-hint' }, jokers ? `uses ${jokers} joker${jokers > 1 ? 's' : ''}` : '');
           buttons.push(h('span', { class: 'claim-opt' },
-            button(`Call ${groupName(o.count)}`, () => { ctx.act({ type: 'claim', call: 'expose', count: o.count, jokers }); ui.claimJokers = {}; }, { variant: 'primary' }),
+            tag(button(`Call ${groupName(o.count)}`, () => { ctx.act({ type: 'claim', call: 'expose', count: o.count, jokers }); ui.claimJokers = {}; }, { variant: 'primary' }), { type: 'claim', call: 'expose', count: o.count }),
             stepper));
         }
       }
       mount(el,
         h('div', { class: 'prompt-title claim-title' }, tileEl(d.tile, { size: 'sm' }), ` ${who} discarded ${tileName(d.tile)}. Call it?`),
-        h('div', { class: 'prompt-row' }, ...buttons, button('Pass', () => ctx.act({ type: 'claim', call: 'pass' }))));
+        h('div', { class: 'prompt-row' }, ...buttons, tag(button('Pass', () => ctx.act({ type: 'claim', call: 'pass' })), { type: 'claim', call: 'pass' })));
       return;
     }
     default:

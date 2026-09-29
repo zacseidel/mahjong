@@ -15,12 +15,13 @@ export function defaultSettings() {
   return {
     schema: SETTINGS_SCHEMA,
     humanSeat: 1,
-    levels: ['intermediate', 'beginner', 'intermediate', 'beginner'], // per seat; the human's is ignored
+    levels: ['beginner', 'beginner', 'beginner', 'beginner'], // per seat; the human's is ignored. Beginner suits new players.
     speed: 'normal',
     trainingWheels: true,
     rules: {},
     tips: { offense: true, defense: true },
     tipsChosen: false,
+    explain: true, // "How this works" explanations for each step
     points: 'points',
   };
 }
@@ -39,6 +40,7 @@ export function normalizeSettings(raw) {
   if (Array.isArray(raw.levels) && raw.levels.length === 4) out.levels = raw.levels.map((l, i) => pick(l, LEVEL_NAMES, d.levels[i]));
   out.speed = pick(raw.speed, SPEED_NAMES, d.speed);
   if (typeof raw.trainingWheels === 'boolean') out.trainingWheels = raw.trainingWheels;
+  if (typeof raw.explain === 'boolean') out.explain = raw.explain;
   out.points = pick(raw.points, POINT_MODES, d.points);
   if (raw.rules && typeof raw.rules === 'object') {
     out.rules = {};
