@@ -7,6 +7,8 @@ import { renderOpponent, renderCenter, renderMyExposures } from './table.js';
 import { renderPrompt } from './prompt.js';
 import { showEndOfHand, showCard, showSettings, showOpponent, openModal, closeModal } from './modals.js';
 import { nameOf, windOf } from './format.js';
+import { loadCards, saveCards } from '../storage.js';
+import { PRACTICE_ID, getCard, setActive, putCard, importCard, playableHands } from '../cardStore.js';
 
 const app = document.getElementById('app');
 const toastEl = document.getElementById('toast');
@@ -18,10 +20,31 @@ function toast(message) {
   toast.timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
 }
 
-async function loadCard() {
+let practiceCard = null;
+async function loadPractice() {
+  if (practiceCard) return practiceCard;
   const res = await fetch('data/practice-card.json');
-  if (!res.ok) throw new Error(`Could not load the practice card (${res.status})`);
-  return res.json();
+  if (!res.ok) throw new Error(`Could not load the practice card (${res.status}).`);
+  practiceCard = await res.json();
+  return practiceCard;
+}
+
+/**
+ * The card to play with: the active card from this browser's library, or the practice card.
+ * @returns {Promise<{card: Object|null, problem?: string}>}
+ */
+async function loadActiveCard() {
+  const store = loadCards();
+  if (store.activeId !== PRACTICE_ID) {
+    const card = getCard(store, store.activeId);
+    if (card && playableHands(card) > 0) return { card };
+    return { card: null, problem: `Your chosen card, “${card?.name ?? 'unknown'}”, has no playable hands yet.` };
+  }
+  try {
+    return { card: await loadPractice() };
+  } catch (e) {
+    return { card: null, problem: `${e.message} If you opened this file directly, serve the folder instead (for example: python3 -m http.server 8000).` };
+  }
 }
 
 const layout = {
@@ -126,21 +149,81 @@ function confirmNewHand() {
   ]);
 }
 
+/** Settings section: which card to play with (from the next hand). */
+function cardChooser() {
+  const store = loadCards();
+  const options = [[PRACTICE_ID, 'Practice Card (included)'],
+    ...store.cards.filter(({ card }) => playableHands(card) > 0).map(({ id, card }) => [id, card.name])];
+  const select = h('select', {
+    'aria-label': 'Card to play with',
+    onchange: async (e) => {
+      const id = e.target.value;
+      const next = setActive(loadCards(), id);
+      if (!saveCards(next)) toast('Couldn’t save your choice in this browser; it applies for this visit only.');
+      session.card = id === PRACTICE_ID ? await loadPractice() : getCard(next, id);
+      toast(`“${session.card.name}” will be used from your next hand.`);
+    },
+  }, ...options.map(([id, name]) => h('option', { value: id, selected: id === store.activeId }, name)));
+  return h('section', {},
+    h('h3', {}, 'Card'),
+    h('div', { class: 'field' }, h('span', {}, 'Play with'), select),
+    h('p', { class: 'muted' }, h('a', { href: 'card.html' }, 'Open the card editor'), ' to enter your own card.'));
+}
+
+/** Shown when there is no playable card: use the practice card, import a file, or open the editor. */
+function showNoCard(problem) {
+  const pick = () => {
+    const input = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return;
+      const { card, errors, fatal } = importCard(await file.text());
+      if (fatal) return toast(fatal);
+      if (playableHands(card) === 0) return toast('That card has no playable hands. Open the card editor to fix it.');
+      const id = `c-${Date.now().toString(36)}`;
+      if (!saveCards(setActive(putCard(loadCards(), id, card), id))) toast('Couldn’t save the card in this browser; playing it for this visit only.');
+      const bad = errors.filter((e) => e.index !== null).length;
+      if (bad) toast(`Imported. ${bad} hand problem${bad === 1 ? '' : 's'} to fix in the card editor; those hands are skipped.`);
+      begin(card);
+    });
+    document.body.append(input);
+    input.click();
+  };
+  mount(app, h('div', { class: 'no-card' },
+    h('h2', {}, 'No card loaded'),
+    h('p', {}, problem),
+    h('div', { class: 'no-card-actions' },
+      button('Play with the practice card', async () => {
+        saveCards(setActive(loadCards(), PRACTICE_ID));
+        try { begin(await loadPractice()); } catch (e) { toast(e.message); }
+      }, { variant: 'primary' }),
+      button('Import a card file', pick),
+      h('a', { class: 'btn', href: 'card.html' }, 'Open the card editor'))));
+}
+
+function begin(card) {
+  app.replaceChildren(layout.top, layout.left, layout.center, layout.right, layout.me, layout.side);
+  session = new Session({ card, settings: defaultSettings(), onChange: render, onEnd });
+  buildTopbar();
+  session.newHand();
+}
+
 function buildTopbar() {
   const bar = document.getElementById('topbar-actions');
   mount(bar,
     button('New hand', confirmNewHand),
-    button('Card', () => showCard(session.card)),
+    button('Card', () => showCard(session.state?.card ?? session.card)),
     hooks.renderSide ? button('Tips', () => { ui.sideOpen = !ui.sideOpen; render(); }) : null,
     button('Settings', () => showSettings(session.settings, {
       onChange: render,
-      extraSections: hooks.settingsSections?.(session.settings, render) ?? [],
+      extraSections: [cardChooser(), ...(hooks.settingsSections?.(session.settings, render) ?? [])],
     })),
+    h('a', { class: 'btn', href: 'card.html' }, 'My cards'),
     h('a', { class: 'btn', href: 'learn.html' }, 'Learn'));
 }
 
 export async function start() {
-  app.replaceChildren(layout.top, layout.left, layout.center, layout.right, layout.me, layout.side);
   rack = new Rack(rackEl, {
     onChange: render,
     onTapSelected: (tile) => {
@@ -149,19 +232,9 @@ export async function start() {
     },
   });
   mount(rackTools, button('Sort', () => { rack.sort(); rack.render(); }, { title: 'Sort your rack by suit and number' }));
-  let card;
-  try {
-    card = await loadCard();
-  } catch (e) {
-    mount(app, h('div', { class: 'no-card' },
-      h('h2', {}, 'No card loaded'),
-      h('p', {}, e.message),
-      h('p', {}, 'If you opened this file directly, serve the folder instead (for example: python3 -m http.server 8000).')));
-    return;
-  }
-  session = new Session({ card, settings: defaultSettings(), onChange: render, onEnd });
-  buildTopbar();
-  session.newHand();
+  const { card, problem } = await loadActiveCard();
+  if (card) begin(card);
+  else showNoCard(problem);
 }
 
 // Seat helper for hooks.

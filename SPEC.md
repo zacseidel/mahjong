@@ -436,8 +436,11 @@ Stats for the human, split by tips on and off:
   - The advanced JSON editor is available per hand for edge cases.
 - Reorder, edit, duplicate, and delete hands.
 - **Export** the card as a JSON file; **import** from one. Validate imports and report which hands failed.
-- Storage: localStorage key `mj.cards.v1`. Schema version inside the data allows future migration.
-- **iPad data loss:** Safari may clear site data after about 7 days without a visit unless the site is added to the home screen. The editor shows a reminder to export a backup and to add the site to the home screen. The game shows a clear "no card loaded" screen with import and practice-card options.
+- Storage: localStorage key `mj.cards.v1`. Schema version inside the data allows future migration. Shape: `{ schema: 1, activeId: 'practice' | <card id>, cards: [{ id, card, updatedAt }] }`. The practice card is never stored; it ships with the site. `js/storage.js` reads and writes it (wrapped so storage can be missing, blocked, full, or corrupt); `js/cardStore.js` holds the pure library logic (hands, import/export, preview) and is tested under Node.
+- Import keeps hands that fail validation, so they can be fixed in the editor, and lists them; the game skips invalid hands until they're fixed. Importing the practice card file makes an editable user copy. The practice card itself can be copied ("Make an editable copy").
+- Choose the card to play with in the editor ("Play with this card") or in Settings. It applies from the next hand. A card with no playable hands can't be chosen.
+- The typo warning (a mistyped card causes false dead-hand alerts) is shown once, until dismissed; the flag lives in `mj.flags.v1`.
+- **iPad data loss:** Safari may clear site data after about 7 days without a visit unless the site is added to the home screen. The editor shows a reminder to export a backup and to add the site to the home screen. The game shows a clear "no card loaded" screen with import and practice-card options when the active card has no playable hands or the practice card can't be loaded. (If Safari clears the site's data, the library is simply empty and the game starts with the practice card; there's no way to tell that data was cleared.)
 
 ---
 

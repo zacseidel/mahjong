@@ -213,6 +213,8 @@ body.game { height: 100dvh; display: flex; flex-direction: column; overflow: hid
 .check input { width: 22px; height: 22px; }
 .opponent .exposure { background: var(--surface-2); }
 .no-card { grid-column: 1 / -1; grid-row: 1 / -1; padding: 40px; text-align: center; }
+.no-card p { max-width: 560px; margin: 8px auto; }
+.no-card-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
 
 /* Narrower screens: tips become an overlay drawer. */
 @media (max-width: 1100px) {
