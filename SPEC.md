@@ -452,6 +452,11 @@ Stats for the human, split by tips on and off:
 - Settings: difficulty per seat, AI speed, tips, training wheels, house rules, point display, active card, human's seat.
 - After each hand: reveal all hands, show what each opponent was building, the settlement, and highlight any human discards that differed from the tip recommendation. "Next hand" and "Replay this deal" buttons.
 
+- Layout: you at the bottom; the player to your right (next in turn) on the right, across at the top, left on the left. Opponents are named by position (Right, Across, Left) with this hand's wind, since Charleston directions refer to them.
+- The game screen renders from the human's observation (§8) and reveals full hands only after the hand ends. `js/ui/session.js` drives AI seats: simultaneous choices (Charleston, claims) resolve instantly, and AI turn actions wait for the chosen speed.
+- A **Card** button shows the active card, with each line in its printed colors.
+- Until stage 9, settings last only for the visit.
+
 ### 13.3 Tile art
 Generate original SVG tiles in code (`js/ui/tileArt.js`) rather than using third-party art. This avoids licensing questions and covers jokers and flowers, which Riichi-oriented tile sets lack. Numbers with a clear suit symbol and color; honors with a clear letter or symbol. Legible at small sizes. Light and dark themes.
 
