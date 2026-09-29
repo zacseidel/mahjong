@@ -268,6 +268,8 @@ Also expose **liveness**: for each still-needed tile, how many copies remain uns
 - which players are dead;
 - the active card (all players use the same card).
 
+The observation also carries the seat's pending `decision` with its legal options, the discard pile and full discard history (with which discards were called), the tiles the seat passed, each seat's concealed-tile count, and a filtered event log (other players' draws and passes are hidden). At the end of a hand it includes the public result.
+
 AI modules and `tips.js` / `defense.js` import **only** observations. A test builds a full state, runs every AI decision function with a spy on its input, and fails if any hidden field (other players' concealed tiles, wall order) is reachable.
 
 ---
@@ -277,8 +279,8 @@ AI modules and `tips.js` / `defense.js` import **only** observations. A test bui
 All opponents are deterministic JS given the seed. Each seat's difficulty is set independently. A short pause (default 600 ms, adjustable, including "instant") before each AI action lets the human follow along.
 
 ### 9.1 Beginner
-- Charleston: picks its single best target at the start and passes tiles not in it. Never stops the second Charleston.
-- Commits to that target and doesn't switch unless it becomes dead.
+- Charleston: picks its single best target at the start and passes tiles not in it. Never stops the second Charleston and never blind-passes.
+- Re-picks once when play starts (the Charleston reshapes the hand), then commits to that target and doesn't switch unless it becomes dead or stops fitting its exposures.
 - Calls every legal exposure that fits its target.
 - Discards the tile least useful to its target, breaking ties randomly (seeded).
 - Makes joker exchanges only 30% of the time they're available.
@@ -292,7 +294,13 @@ All opponents are deterministic JS given the seed. Each seat's difficulty is set
 - Discards the tile whose removal increases distance to its weighted top targets the least.
 - Always takes joker exchanges that help it.
 - Detects and declares dead hands.
+- Blind-passes on the eligible rounds rather than break up tiles its targets use.
 - No defense in v1.
+
+### 9.4 Implementation notes
+- `createAI(level, {seat, seed})` returns `{decide(observation) → action, describe()}`. AI state (a committed target, its own seeded rng) lives in that object; it never sees the game state.
+- Target weights (value, liveness, distance behind the best) and other tuning constants live in `WEIGHTS` in `evaluator.js`. Tips use the same weighting, so tip recommendations match the intermediate AI.
+- In a 400-game seeded check with two of each level, intermediate won about 1.7× as often as beginner.
 
 ### 9.3 Advanced (v2)
 Intermediate plus defense: reads opponents with §10, folds when appropriate, avoids feeding exposures to near-complete hands.
@@ -477,7 +485,7 @@ Use only practice-card hands in examples.
 1. `rng`, `tiles`, `wall`: tile ids, seeded shuffle, deal. Tests: 152 tiles, correct counts, deterministic by seed.
 2. `card`: parse notation, compile, expand, match a 14-tile hand. Tests: every parse rule in §5.3, color permutations, shift bounds, dragon pairing, soap as zero, jokers rejected in pairs and singles, concealed rules, invented test hands only. Practice-card validation test.
 3. `rules`: joker exchanges, legal calls, dead-hand checks. Tests for each rule in §4.
-4. `charleston` and `game`: the full state machine, the event log, the claim window, and `scoring`. Simulation test: 1,000 seeded all-AI games (until stage 5, a simple test-only bot policy stands in for the AI) with invariants checked every turn (tile conservation, hand sizes 13/14, no jokers passed, no illegal calls, settlements sum to zero).
+4. `charleston` and `game`: the full state machine, the event log, the claim window, and `scoring`. Simulation test: 1,000 seeded all-AI games (the real AI from stage 5, at all-intermediate, all-beginner, and mixed tables) with invariants checked every turn (tile conservation, hand sizes 13/14, no jokers passed, no illegal calls, settlements sum to zero).
 5. `observe`, `evaluator`, then the beginner and intermediate AI. The information-hiding test.
 6. UI: game screen, rack, discards, claim bar, Charleston.
 7. Tips (offense, then defense), `learn.html`.

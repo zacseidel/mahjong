@@ -42,6 +42,7 @@ export class CardError extends Error {
  * @property {Int8Array} single    Per-tile counts of pair/single slots (no jokers).
  * @property {Int8Array} group     Per-tile counts of group slots.
  * @property {boolean} hasGroups
+ * @property {number[]} kinds       Tile ids this target uses (single or group), ascending.
  * @property {string} key          Identity for de-duplication.
  *
  * @typedef {{tile: number, count: number, jokers: number}} Exposure
@@ -262,6 +263,7 @@ function buildTarget(layout, hand) {
     single,
     group,
     hasGroups: groups.length > 0,
+    kinds: [...new Set(layout.map((x) => x.tile))].sort((a, b) => a - b),
     key: `${sortedGroups}|${single.join('')}`,
   };
 }
