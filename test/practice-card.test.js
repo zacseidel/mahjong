@@ -50,3 +50,15 @@ test('practice card meets SPEC §5.4 coverage', () => {
   for (const n of [1, 2, 3]) assert.ok(suitCounts.has(n), `no ${n}-suit hand`);
   assert.ok(card.hands.some((h) => h.category === String(card.year) && h.line.includes(String(card.year))));
 });
+
+test('learn.html quotes only practice-card hands (or single groups from them)', () => {
+  const html = readFileSync(new URL('../learn.html', import.meta.url), 'utf8');
+  const lines = [...html.matchAll(/data-line="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(lines.length >= 3);
+  const tokens = new Set(card.hands.flatMap((h) => h.line.split(/\s+/)));
+  for (const line of lines) {
+    const whole = card.hands.some((h) => h.line === line);
+    const single = !line.includes(' ') && tokens.has(line);
+    assert.ok(whole || single, `learn.html quotes "${line}", which is not on the practice card`);
+  }
+});

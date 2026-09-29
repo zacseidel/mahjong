@@ -48,12 +48,15 @@ export const hooks = {
   endExtra: null,       // (record, session) => HTMLElement
   settingsSections: null, // (settings, onChange) => HTMLElement[]
   onHumanAction: null,  // (obs, action) => void — before the action is applied
+  onNewHand: null,      // () => void
+  getSettings: () => session?.settings,
 };
 
 let session;
 let rack;
 let lastState = null;
-const ui = { blind: 0, claimJokers: {}, sideOpen: true };
+// The tips panel starts open where it fits beside the table, closed where it would overlay it.
+const ui = { blind: 0, claimJokers: {}, sideOpen: window.matchMedia('(min-width: 1101px)').matches, highlightHand: null };
 
 function render() {
   if (!session?.state) return;
@@ -62,6 +65,8 @@ function render() {
     rack.reset();
     ui.blind = 0;
     ui.claimJokers = {};
+    ui.highlightHand = null;
+    hooks.onNewHand?.();
   }
   const obs = session.observation();
   const human = obs.seat;
@@ -89,7 +94,7 @@ function render() {
   rack.marks = new Map();
   hooks.decorate?.(obs, rack, ui);
   rack.render();
-  if (hooks.renderSide && ui.sideOpen) hooks.renderSide(layout.side, obs, session, ui, render);
+  if (hooks.renderSide && ui.sideOpen) hooks.renderSide(layout.side, obs, session, ui, render, humanAct);
   app.classList.toggle('side-closed', !ui.sideOpen || !hooks.renderSide);
 }
 

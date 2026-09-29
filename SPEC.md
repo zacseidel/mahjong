@@ -309,7 +309,7 @@ Intermediate plus defense: reads opponents with §10, folds when appropriate, av
 
 ## 10. Tips (toggleable)
 
-Tips are off by default for a returning player and on by default for a first-time player. Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
+Tips are off by default for a returning player and on by default for a first-time player. (Until stage 9 adds saved settings, every visit counts as a first visit, so tips start on.) Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
 
 ### 10.1 Offense tips
 - **Closest hands:** the top 3 targets with distance, value, and the tiles still needed. Tap one to highlight the tiles in your rack it uses.
@@ -356,9 +356,16 @@ Never show a percentage.
   - fewer than about 25 tiles remain in the wall,
   - some opponent's threat is high.
   - Then the discard tip switches to "safest tile that hurts your hand least," and shows the stakes: "Throwing West's winning tile costs you 50 instead of 25."
+  - "Safest" goes by danger level (safe, low, medium, high), then by harm to your hand. Jokers are always safe but are recommended only when every other tile is medium or high danger.
 - **Dead-hand alert:** "West's exposures don't match any hand on your card. You can declare their hand dead." Offer a button. Warn once, in the card editor, that a mistyped card causes false alerts.
 
 ---
+
+### 10.7 Implementation notes
+- `defense.js` and `tips.js` take only observations. Tuning constants live in `DEFENSE` (defense.js) and `WEIGHTS` (evaluator.js).
+- Offense tips use the intermediate AI's weighting, with ties broken deterministically, so the same situation always gets the same tip.
+- The post-hand review compares each human discard with `recommendedDiscard` (the fold tip when folding is advised, otherwise the offense discard tip).
+- Threat badges and danger marks appear only during play, and only with defense tips on.
 
 ## 11. Scoring
 
@@ -481,7 +488,7 @@ Plain-language sections, each with tile images:
 9. Beginner strategy: keep several hands open early, commit around the end of the Charleston, watch exposures, and when defense is worth it.
 10. How to use this site: tips, the card editor, and backing up your card.
 
-Use only practice-card hands in examples.
+Use only practice-card hands in examples. A test checks that every card line quoted in `learn.html` is on the practice card.
 
 ---
 

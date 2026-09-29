@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="How to play American mah jongg: the tiles, the card, the Charleston, calling, jokers, scoring, and beginner strategy.">
+  <title>Learn American Mah Jongg</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/learn.css">
+  <script type="module" src="js/ui/learn.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1><a href="index.html">Mah Jongg Practice</a></h1>
+    <nav aria-label="Pages">
+      <a class="btn" href="index.html">Play</a>
+    </nav>
+  </header>
+
+  <div class="learn">
+    <nav class="toc" aria-label="Contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#what">What it is</a></li>
+        <li><a href="#tiles">The tiles</a></li>
+        <li><a href="#card">Reading the card</a></li>
+        <li><a href="#charleston">The Charleston</a></li>
+        <li><a href="#turn">A turn, and calling</a></li>
+        <li><a href="#jokers">Jokers</a></li>
+        <li><a href="#winning">Winning, dead hands, wall games</a></li>
+        <li><a href="#scoring">Scoring</a></li>
+        <li><a href="#strategy">Beginner strategy</a></li>
+        <li><a href="#site">Using this site</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <h1>Learn American mah jongg</h1>
+      <p class="lede">Everything you need to play your first hand here, in about ten minutes. Examples use this site’s own practice card; the game works with your own card too.</p>
+
+      <section id="what">
+        <h2>1. What American mah jongg is</h2>
+        <p>Four players each try to be the first to collect 14 tiles that exactly match one of the hands printed on <strong>the card</strong>. In the American game, a new card of hands is published every year, and everyone at the table plays from the same card.</p>
+        <p>If you’ve seen other styles, the big differences are:</p>
+        <ul>
+          <li><strong>The card.</strong> You don’t build any hand you like; you build one of the hands on the card, exactly.</li>
+          <li><strong>No runs are called.</strong> You can take someone’s discard only for a group of three or more identical tiles, or to win.</li>
+          <li><strong>Jokers.</strong> Eight jokers can stand in for tiles in groups of three or more.</li>
+          <li><strong>The Charleston.</strong> Before play starts, everyone passes tiles to each other to improve their hands.</li>
+          <li><strong>Flowers are part of hands</strong>, not bonus tiles.</li>
+        </ul>
+      </section>
+
+      <section id="tiles">
+        <h2>2. The tiles</h2>
+        <p>There are 152 tiles.</p>
+        <h3>Three suits, numbered 1 to 9, four of each</h3>
+        <div class="tiles-example"><span data-tiles="1C 2C 3C 4C 5C 6C 7C 8C 9C"></span><span class="cap">Craks</span></div>
+        <div class="tiles-example"><span data-tiles="1B 2B 3B 4B 5B 6B 7B 8B 9B"></span><span class="cap">Bams</span></div>
+        <div class="tiles-example"><span data-tiles="1D 2D 3D 4D 5D 6D 7D 8D 9D"></span><span class="cap">Dots</span></div>
+        <p>Real tile sets draw these many different ways. On this site each suit has its own color and its own mark (a diamond for Craks, a stalk for Bams, a ring for Dots), so you can tell them apart without relying on color.</p>
+        <h3>Winds (four of each)</h3>
+        <div class="tiles-example"><span data-tiles="NW EW WW SW"></span><span class="cap">North, East, West, South</span></div>
+        <h3>Dragons (four of each), each paired with a suit</h3>
+        <div class="tiles-example"><span data-tiles="RD 1C"></span><span class="cap">Red dragon goes with Craks</span></div>
+        <div class="tiles-example"><span data-tiles="GD 1B"></span><span class="cap">Green dragon goes with Bams</span></div>
+        <div class="tiles-example"><span data-tiles="WD 1D"></span><span class="cap">White dragon (“Soap”) goes with Dots</span></div>
+        <p>The white dragon also serves as <strong>zero</strong>, for example the 0 in 2026.</p>
+        <h3>Flowers (8) and jokers (8)</h3>
+        <div class="tiles-example"><span data-tiles="F J"></span><span class="cap">All flowers are interchangeable.</span></div>
+      </section>
+
+      <section id="card">
+        <h2>3. Reading the card</h2>
+        <p>Each line on the card is one hand. Here is one from the practice card:</p>
+        <div class="card-example"><span data-line="11g 222g 3333g FFF DDr"></span> <span class="muted">Consecutive Run · 30 X · any 3 consecutive numbers</span></div>
+        <ul>
+          <li><strong>Groups</strong> are separated by spaces. <span class="mono">3333</span> is a kong (four of a kind), <span class="mono">222</span> a pung (three), <span class="mono">11</span> a pair.</li>
+          <li><strong>Colors are suits, but not particular suits.</strong> Everything in the same color is in the same suit; different colors must be different suits. You choose which suits.</li>
+          <li><strong>D</strong> is a dragon: the one paired with the suit of its color. Here the green groups are one suit, so the red D is the dragon of a <em>different</em> suit.</li>
+          <li><strong>The note</strong> says which numbers may vary. “Any 3 consecutive” means 1-2-3, 2-3-4, and so on up to 7-8-9. Without a note, the numbers are exactly as printed.</li>
+          <li><strong>X or C</strong>: X hands may be <strong>exposed</strong> (you may call discards to make groups). C hands must stay <strong>concealed</strong>.</li>
+          <li><strong>The number</strong> is the hand’s value in points.</li>
+        </ul>
+        <p>One way to make that hand, with Bams as the green suit and Craks for the red dragon:</p>
+        <div class="tiles-example"><span data-tiles="4B 4B 5B 5B 5B 6B 6B 6B 6B F F F RD RD"></span></div>
+        <p>A mixed group like <span data-line="2026g"></span> is four single tiles: a 2, a Soap (for 0), another 2, and a 6, all 2s and 6s in one suit.</p>
+        <p>Tap <strong>Card</strong> in the game to see the whole card at any time.</p>
+      </section>
+
+      <section id="charleston">
+        <h2>4. The Charleston</h2>
+        <p>East starts with 14 tiles; everyone else has 13. Before play, everyone passes three tiles at a time, all at once. <strong>Jokers can never be passed.</strong></p>
+        <ol>
+          <li><strong>First Charleston</strong> (always): pass right, then across, then left.</li>
+          <li>On that last pass (left), you may <strong>blind pass</strong>: pass along 1, 2, or 3 of the tiles coming to you without looking at them, and make up the rest from your hand. Useful when you don’t have three tiles you want to give up.</li>
+          <li><strong>Second Charleston</strong> (optional): anyone may stop it. If it happens: left, across, right. The last pass (right) may be blind.</li>
+          <li><strong>Courtesy pass</strong>: you and the player across from you each ask for 0 to 3 tiles, and trade the smaller number.</li>
+        </ol>
+        <p class="tip-box">An easy way to remember: <strong>Right, Across, Left</strong>, then back the other way: <strong>Left, Across, Right</strong>.</p>
+        <p>Use the Charleston to choose which hands to aim for. Pass tiles that fit none of them.</p>
+      </section>
+
+      <section id="turn">
+        <h2>5. A turn, and calling discards</h2>
+        <p>East discards first. Then play moves to the right (East, South, West, North). On your turn you:</p>
+        <ol>
+          <li><strong>Draw</strong> a tile from the wall.</li>
+          <li>Optionally make <strong>joker exchanges</strong> (see Jokers).</li>
+          <li>Declare <strong>Mah Jongg</strong> if you have it, or <strong>discard</strong> one tile face up and name it.</li>
+        </ol>
+        <h3>Calling</h3>
+        <p>When someone discards, you may take (“call”) that tile:</p>
+        <ul>
+          <li>to complete a <strong>group of three or more</strong> identical tiles, which you then place face up (“expose”), jokers allowed; or</li>
+          <li>to <strong>win</strong>. This is the only time you can call a tile for a pair or a single.</li>
+        </ul>
+        <div class="tiles-example"><span data-tiles="7B 7B J"></span><span class="cap">Holding 7 Bam, 7 Bam, and a joker, you can call a discarded 7 Bam and expose a kong.</span></div>
+        <p>After calling for an exposure, you discard, and play continues to your right; anyone in between is skipped. A discarded joker can’t be called. If more than one person wants a tile, a call to win beats a call to expose; otherwise the player next in turn gets it.</p>
+        <p>Exposing tells everyone what you’re building and rules out every concealed (C) hand. This site only offers you calls that still fit a hand on the card.</p>
+      </section>
+
+      <section id="jokers">
+        <h2>6. Jokers</h2>
+        <ul>
+          <li>A joker can stand in for any tile in a <strong>group of three or more</strong>: pung, kong, quint.</li>
+          <li>A joker can <strong>never</strong> be part of a pair or a single tile, including the single tiles in year hands and singles-and-pairs hands.</li>
+          <li>A <strong>quint</strong> (five of a kind) always needs a joker, since there are only four of each tile.</li>
+        </ul>
+        <h3>Joker exchange</h3>
+        <p>On your turn, if any exposure on the table has a joker standing in for a tile you hold, you may swap your real tile for that joker.</p>
+        <div class="tiles-example"><span data-tiles="NW NW J"></span><span class="cap">Someone exposed a pung of North with a joker. If you hold a North, you can swap it for their joker.</span></div>
+        <p>A joker is usually worth more than the tile you give up, since it fits any group.</p>
+      </section>
+
+      <section id="winning">
+        <h2>7. Winning, dead hands, and wall games</h2>
+        <p><strong>Mah Jongg</strong>: your 14 tiles (exposed plus concealed) exactly match one hand on the card, with jokers only in groups. You can win on a tile you draw (“self-drawn”) or on someone’s discard.</p>
+        <p>With <em>training wheels</em> on (the default), the Mah Jongg button lights up only when your hand really is Mah Jongg. With them off, declaring by mistake makes your hand dead.</p>
+        <p><strong>Dead hand</strong>: a player whose exposures don’t fit any hand on the card, or who has the wrong number of tiles, can’t win. Their hand is “dead”: they stop playing, and still pay the winner.</p>
+        <p><strong>Wall game</strong>: if the wall runs out before anyone wins, nobody pays. The deal passes to the next player either way.</p>
+      </section>
+
+      <section id="scoring">
+        <h2>8. Scoring</h2>
+        <p>The winner collects from everyone else, based on the hand’s value on the card.</p>
+        <table class="score-table">
+          <thead><tr><th>How you win</th><th>Who pays</th></tr></thead>
+          <tbody>
+            <tr><td>On a discard</td><td>The discarder pays double; the other two pay the value.</td></tr>
+            <tr><td>Self-drawn</td><td>All three pay double.</td></tr>
+            <tr><td>Jokerless</td><td>The value doubles if no jokers are anywhere in your hand, except in hands made only of singles and pairs, where jokers can’t be used anyway.</td></tr>
+          </tbody>
+        </table>
+        <h3>Worked examples</h3>
+        <p>Using the practice hand <span data-line="1111g 222r 3333g 444r"></span> <span class="muted">(Consecutive Run, 25 points)</span>:</p>
+        <ul>
+          <li><strong>Win on a discard</strong>, with a joker in your hand: the discarder pays 50, the other two pay 25 each. You collect 100.</li>
+          <li><strong>Self-drawn</strong>, with a joker: all three pay 50. You collect 150.</li>
+          <li><strong>Jokerless, on a discard</strong>: the value doubles to 50, so the discarder pays 100 and the others 50 each. You collect 200.</li>
+        </ul>
+        <p>Using <span data-line="NN EE WW SS DDg DDr DDb"></span> <span class="muted">(Singles &amp; Pairs, 50 C)</span>: jokerless never doubles here, since jokers couldn’t be used. Won on a discard, the discarder pays 100 and the others 50: you collect 200.</p>
+        <p>Tables differ on some scoring details. You can change them in <strong>Settings</strong>.</p>
+      </section>
+
+      <section id="strategy">
+        <h2>9. Beginner strategy</h2>
+        <ul>
+          <li><strong>Keep several hands open early.</strong> After the deal, find two or three hands your tiles fit, and keep tiles that serve more than one.</li>
+          <li><strong>Commit around the end of the Charleston.</strong> By the courtesy pass you should know your main target, and a backup.</li>
+          <li><strong>Pairs are the hard part.</strong> Jokers can’t help with pairs and singles. A hand that needs a pair of a tile that’s already been thrown three times is in trouble.</li>
+          <li><strong>Hold on to jokers.</strong> They’re the most flexible tiles you have. Throwing one is rarely right.</li>
+          <li><strong>Watch exposures.</strong> Once a player exposes, only a few hands on the card fit what they’ve shown. Tap an opponent in the game to see which.</li>
+          <li><strong>Know when to play defense.</strong> Late in the wall, if you’re still far from a hand and someone else looks close, stop feeding them: discard tiles they can’t use, even if it hurts your hand. Throwing someone’s winning tile costs you double.</li>
+        </ul>
+      </section>
+
+      <section id="site">
+        <h2>10. Using this site</h2>
+        <ul>
+          <li><strong>Tips</strong> (the side panel) show your closest hands, what to pass, what to discard, whether to call, and, on defense, how dangerous each tile in your rack is: ✓ safe, · low, ! medium, !! high. Tap a tip to see why. Turn offense and defense tips on or off in Settings.</li>
+          <li><strong>Opponents</strong> can be Beginner or Intermediate, set per seat in Settings. Tap an opponent’s name to see what you know about them.</li>
+          <li>After each hand you’ll see everyone’s tiles, what each opponent was building, and which of your discards differed from the tips. <strong>Replay this deal</strong> lets you try the same tiles again.</li>
+          <li><strong>Your own card.</strong> The site ships with an original practice card. A card editor, for entering the card you’ve bought so you can practice with it, is coming soon. Cards you enter stay in your browser only. Export a backup, since browsers (especially Safari on iPad) may clear site data you haven’t visited in a while.</li>
+          <li><strong>House rules.</strong> A few rules vary from table to table, or are worth checking against the rules booklet that comes with your card. They’re marked ✱ in Settings, where you can change them.</li>
+        </ul>
+        <p class="muted small">This practice site is not affiliated with or endorsed by any mah jongg league or card publisher. The practice card was written for this site; use it alongside the official card you purchase.</p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
