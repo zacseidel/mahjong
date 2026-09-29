@@ -132,7 +132,7 @@ The §11.2 scoring house rules live in the same rules object.
 }
 ```
 
-`source` is `"practice"` or `"user"`. Multiple cards can be stored; one is active.
+`source` is `"practice"` or `"user"`. `year` is the year the card's year hands spell out, or `null`; the practice card uses the current year (2026). Multiple cards can be stored; one is active.
 
 ### 5.2 Hand object
 
