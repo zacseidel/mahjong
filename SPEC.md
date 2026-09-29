@@ -103,6 +103,19 @@ AI opponents decide whether to stop the second Charleston (§9). The UI offers t
 - Mah Jongg: settle payments (§11).
 - **Wall game:** if the wall runs out with no winner, nobody pays.
 
+### 4.9 Rule variant settings
+Every **[verify]** rule above is a setting in `js/engine/rules-config.js`. The default is the rule as written above. Users can change these in Settings, and the values are stored locally. Engine code reads a rules object from `resolveRules()`, which ignores unknown keys and invalid values.
+
+| Key | Default | Alternatives | Rule |
+|---|---|---|---|
+| `dealerRotation` | `'always'` | `'winnerKeeps'` | §4.1 |
+| `courtesyPass` | `'min'` | `'off'` | §4.2 |
+| `mahJonggBeatsExposure` | `true` | `false` (next in turn always wins) | §4.4 |
+| `concealedCanCallForMahJongg` | `true` | `false` | §4.4 |
+| `falseMahJongg` | `'deadHand'` | `'retract'` (no penalty) | §4.6 |
+
+The §11.2 scoring house rules live in the same rules object.
+
 ---
 
 ## 5. Card data
@@ -185,6 +198,8 @@ The notation is the primary input; the compiled-group format is the fallback.
 js/engine/
   rng.js         seeded PRNG (mulberry32) and shuffle
   tiles.js       tile ids, helpers, string forms
+  seats.js       seat ids, right/across/left, turn distance, dealer rotation
+  rules-config.js  rule variants and house rules (§4.9, §11.2)
   wall.js        building the wall, dealing, drawing
   card.js        parse line notation, compile, expand, match a hand to the card
   rules.js       joker legality, legal calls, joker exchanges, dead-hand checks
@@ -357,6 +372,8 @@ function settle({ winner, discarder, selfDrawn, value, jokerless, hasGroups }, r
 - Wall game: no payments.
 
 ### 11.2 House-rule settings
+All but point display (a UI setting) are keys in `rules-config.js` (§4.9).
+
 | Setting | Default |
 |---|---|
 | Jokerless double | on |
@@ -460,7 +477,11 @@ Use only practice-card hands in examples.
 ## 16. Tests (`test/`)
 
 Minimum coverage:
+- `rng.test.js`: determinism by seed, ranges, shuffle is a permutation.
 - `tiles.test.js`: ids, helpers, counts.
+- `seats.test.js`: pass directions, turn order, dealer rotation.
+- `wall.test.js`: deal sizes, deal order, determinism, conservation while drawing.
+- `rules-config.test.js`: defaults, overrides, invalid values ignored.
 - `card.test.js`: notation parsing and errors, expansion, matching, jokers in pairs/singles rejected, concealed vs exposed, practice-card validity.
 - `rules.test.js`: calls allowed and disallowed, call priority, joker exchanges, dead hands.
 - `charleston.test.js`: pass directions, blind passes, stop vote, courtesy pass, jokers never passed.
