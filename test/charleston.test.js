@@ -141,3 +141,17 @@ test('courtesy pass trades across', () => {
   assert.throws(() => resolveCourtesy(hands, [P('1C'), [], P('1D 2D'), []], counts), /must be 2/);
   assert.throws(() => resolveCourtesy(hands, [P('1C J'), [], P('1D 2D'), []], counts), /Jokers/);
 });
+
+test('a blind pass forwards the same tiles whatever order the sender picked them in', () => {
+  const hands = HANDS();
+  const choose = (eastTiles) => [
+    { tiles: P(eastTiles) },
+    { tiles: P('1B'), blind: 2 },
+    { tiles: P('1D 2D 3D') },
+    { tiles: P('NW EW WW') },
+  ];
+  const a = resolvePass(hands, 'right', choose('1C 2C 3C'), true);
+  const b = resolvePass(hands, 'right', choose('3C 1C 2C'), true);
+  assert.deepEqual(b.hands.map(sorted), a.hands.map(sorted));
+  assert.deepEqual(b.received.map(sorted), a.received.map(sorted));
+});

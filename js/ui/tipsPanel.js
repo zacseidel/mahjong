@@ -5,13 +5,14 @@
 
 import { h, mount, button } from './dom.js';
 import { tileEl } from './tileArt.js';
-import { nameOf, cardLine, tileName, groupName } from './format.js';
+import { nameOf, cardLine } from './format.js';
 import { richText } from './glossaryUI.js';
 import { explainStep } from '../engine/coach.js';
 import { offenseTips, defenseTips, suggestion, handView, colorLegend } from '../engine/tips.js';
 import { matchHand } from '../engine/card.js';
 import { evaluateHand } from '../engine/evaluator.js';
 import { JOKER, displayName } from '../engine/tiles.js';
+import { sameAction, describeAction as describe } from '../engine/actions.js';
 
 const DANGER = {
   safe: { symbol: '✓', label: 'Safe to discard' },
@@ -70,37 +71,6 @@ function legendEl(legend) {
     i ? ', ' : '', h('span', { class: `tok-${c}` }, COLOR_WORD[c]), ` = ${suit}`]));
 }
 
-/** Describe an action in plain words, for the review. */
-function describe(a) {
-  if (!a) return 'no suggestion';
-  switch (a.type) {
-    case 'pass': return `pass ${a.tiles.map(displayName).join(', ') || 'nothing from your hand'}${a.blind ? ` + ${a.blind} blind` : ''}`;
-    case 'courtesyPass': return `give ${a.tiles.map(displayName).join(', ')}`;
-    case 'courtesyRequest': return `ask for ${a.count}`;
-    case 'vote': return a.stop ? 'stop the second Charleston' : 'play the second Charleston';
-    case 'discard': return `discard ${displayName(a.tile)}`;
-    case 'exchange': return 'swap for a joker';
-    case 'mahjong': return 'declare Mah Jongg';
-    case 'declareDead': return 'declare a dead hand';
-    case 'claim': return a.call === 'pass' ? 'pass' : a.call === 'mahjong' ? 'call Mah Jongg' : `call a ${groupName(a.count)}`;
-    default: return a.type;
-  }
-}
-
-const sameTiles = (x = [], y = []) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
-function sameAction(a, b) {
-  if (!a || !b || a.type !== b.type) return false;
-  switch (a.type) {
-    case 'pass': return sameTiles(a.tiles, b.tiles) && (a.blind ?? 0) === (b.blind ?? 0);
-    case 'courtesyPass': return sameTiles(a.tiles, b.tiles);
-    case 'courtesyRequest': return a.count === b.count;
-    case 'vote': return a.stop === b.stop;
-    case 'discard': return a.tile === b.tile;
-    case 'claim': return a.call === b.call && (a.call !== 'expose' || a.count === b.count);
-    default: return true;
-  }
-}
-
 /**
  * Register with the game page.
  * @param {typeof import('./main.js').hooks} hooks
@@ -118,8 +88,16 @@ export function installTips(hooks) {
     if (!showTip && !showStep) return null;
     const seen = new Set();
     const box = h('div', { class: 'coach' });
+    const guide = ui.tutorial;
+    if (guide?.note) {
+      box.append(h('div', { class: 'lesson' },
+        h('span', { class: 'coach-label' }, 'Lesson'), ' ', h('strong', {}, guide.note.title),
+        h('p', {}, richText(guide.note.text, seen)),
+        button('Got it', guide.dismiss, { variant: 'small' })));
+    }
     if (showStep) {
-      const details = h('details', { class: 'coach-step', open: ui.stepOpen !== false },
+      // While a lesson note is showing, it's the focus: keep the step explanation folded.
+      const details = h('details', { class: 'coach-step', open: guide?.note ? false : ui.stepOpen !== false },
         h('summary', {}, h('span', { class: 'coach-label' }, 'How this works'), ` ${step.title}`),
         h('p', {}, richText(step.text, seen)));
       details.addEventListener('toggle', () => { ui.stepOpen = details.open; });
@@ -136,12 +114,14 @@ export function installTips(hooks) {
         ui.showMe = { key, action: a };
         rerender();
       };
+      const how = { pass: 'Tap the highlighted tiles, then press Pass.', courtesyPass: 'Tap the highlighted tiles, then press Pass.', discard: 'Tap the highlighted tile, then press Discard.' }[sug.action.type]
+        ?? 'Press the highlighted button.';
       box.append(h('div', { class: 'coach-tip' },
-        h('span', { class: 'coach-label tip-label' }, 'Tip'),
-        h('span', { class: 'coach-line' }, richText(sug.line, seen)),
+        h('span', { class: 'coach-label tip-label' }, guide ? 'Your move' : 'Tip'),
+        h('span', { class: 'coach-line' }, richText(sug.line, seen), guide ? h('span', { class: 'coach-how' }, ` ${how}`) : null),
         h('span', { class: 'coach-buttons' },
           button('Why?', () => { ui.whyOpen = ui.whyOpen === key ? null : key; rerender(); }, { variant: 'small' }),
-          button('Show me', showMe, { variant: 'small' }))),
+          guide ? null : button('Show me', showMe, { variant: 'small' }))),
       why);
     }
     return box;

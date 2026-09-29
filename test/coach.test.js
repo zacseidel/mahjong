@@ -168,3 +168,21 @@ test('suggested actions are always legal in real games', () => {
   }
   assert.ok(n > 80);
 });
+
+test('when no hand can be completed, tips say so and suggest defense', () => {
+  // A North pung is exposed, so only "winds" fits; all four South winds (its pair) are gone.
+  const dead = {
+    exposures: [[{ tile: T('NW'), count: 3, jokers: 0 }], [], [], []],
+    discardHistory: [],
+  };
+  const o = obs('EW EW EW 7B 7B 7B 8B 8B 1D 2D 3D', turn(), dead);
+  o.discards = P('SW SW SW SW').map((tile) => ({ seat: 2, tile }));
+  const [c] = closestHands(o);
+  assert.equal(c.dead, true, 'the nearest hand is shown, marked dead');
+  const s = suggestion(o);
+  assert.equal(s.action.type, 'discard');
+  assert.match(s.line, /can’t be completed/);
+  assert.match(s.detail, /pair or single/);
+  const claim = suggestion({ ...o, decision: { seat: 0, kind: 'claim', tile: T('8B'), discarder: 1, options: [{ type: 'expose', tile: T('8B'), count: 3, minJokers: 0, maxJokers: 0 }] } });
+  assert.deepEqual(claim.action, { type: 'claim', call: 'pass' });
+});

@@ -100,8 +100,11 @@ function usedTiles(e, hand) {
 export function closestHands(obs, evals = evaluateObservation(obs), n = 3) {
   const out = [];
   const seen = new Set();
+  // Live hands first. If none is left, show the nearest dead ones (marked dead) so the player
+  // can see why their hand can't be finished.
+  const anyLive = evals.some((e) => !e.dead);
   for (const e of evals) {
-    if (e.dead || seen.has(e.target.handId)) continue;
+    if ((anyLive && e.dead) || seen.has(e.target.handId)) continue;
     seen.add(e.target.handId);
     out.push({
       handId: e.target.handId,
@@ -163,7 +166,33 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
   const best = closest[0];
   const bestText = best ? `${best.hand.category} ${best.hand.line}` : 'no hand';
 
-  if (!d || !best) return { closest, tips, recommendedDiscard };
+  if (!d) return { closest, tips, recommendedDiscard };
+
+  // No hand on the card can still be completed: say so, and play defense.
+  if (!best || best.dead) {
+    const why = best
+      ? `Your nearest hand, ${best.hand.line}, needs a pair or single tile whose copies are all gone, and jokers can’t fill pairs or singles.`
+      : 'Your exposures don’t fit any hand on the card.';
+    if (d.kind === 'turn' && d.mahJongg) {
+      tips.push({ kind: 'mahjong', action: { type: 'mahjong' }, line: 'You have Mah Jongg! Declare it.', detail: 'Your 14 tiles match a hand on the card.' });
+    } else if (d.kind === 'turn') {
+      const report = defenseReport(obs);
+      const pick = obs.hand.slice().sort((a, b) => report.scores[a] - report.scores[b] || (a === JOKER) - (b === JOKER))[0];
+      recommendedDiscard = pick;
+      tips.push({
+        kind: 'discard', tile: pick, action: { type: 'discard', tile: pick },
+        line: `Your hand can’t be completed now, so play defense: discard ${displayName(pick)}, a safe tile.`,
+        detail: `${why} You can’t win this hand, but you can still avoid paying double by not throwing someone else’s winning tile.`,
+      });
+    } else if (d.kind === 'claim') {
+      const win = d.options.some((o) => o.type === 'mahjong');
+      tips.push(win
+        ? { kind: 'call', action: { type: 'claim', call: 'mahjong' }, line: `Call it: ${displayName(d.tile)} completes your hand!`, detail: 'Taking a discard for Mah Jongg is always allowed when it completes a hand on the card.' }
+        : { kind: 'call', action: { type: 'claim', call: 'pass' }, line: 'Pass: your hand can’t be completed now, so calling won’t help.', detail: why });
+    }
+    // Charleston decisions (no exposures yet, so a dead nearest hand is rare) get the usual advice.
+    if (d.kind === 'turn' || d.kind === 'claim') return { closest, tips, recommendedDiscard };
+  }
 
   if (d.kind === 'pass' || d.kind === 'courtesyPass') {
     const n = d.kind === 'pass' ? 3 : d.count;
@@ -181,7 +210,11 @@ export function offenseTips(obs, { nameOf = (s) => `Seat ${s}` } = {}) {
     const action = d.kind === 'pass'
       ? { type: 'pass', tiles: (blind ? free : picks).map((p) => p.tile), blind }
       : { type: 'courtesyPass', tiles: picks.map((p) => p.tile) };
-    tips.push({ kind: 'charleston', line, detail, tiles: action.tiles, action });
+    // When a blind pass is the suggestion, say so: the line must describe the suggested move.
+    const blindLine = blind
+      ? `Blind pass: ${free.length ? `pass ${names(free.map((p) => p.tile))} and ` : ''}${plural(blind, 'unseen tile')}. ${free.length ? `Only ${plural(free.length, 'tile')} of yours ${free.length === 1 ? 'is' : 'are'}` : 'None of your tiles are'} truly spare.`
+      : line;
+    tips.push({ kind: 'charleston', line: blindLine, detail, tiles: action.tiles, action });
   }
 
   if (d.kind === 'vote') {

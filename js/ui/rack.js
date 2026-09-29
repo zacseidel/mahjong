@@ -18,6 +18,7 @@ export class Rack {
     this.selected = new Set();
     this.fresh = new Set();
     this.highlight = new Set(); // tile ids to highlight (tips)
+    this.highlightUids = new Set(); // specific tiles to highlight (a suggested pass or discard)
     this.marks = new Map(); // tile id → danger mark (stage 7)
     this.nextUid = 1;
     this.limit = 0;
@@ -70,6 +71,15 @@ export class Rack {
     this.selected.clear();
   }
 
+  /** Highlight exactly these tiles (a multiset: one rack tile per entry), e.g. a suggested pass. */
+  highlightExactly(tiles) {
+    this.highlightUids = new Set();
+    for (const t of tiles) {
+      const slot = this.slots.find((x) => x.tile === t && !this.highlightUids.has(x.uid));
+      if (slot) this.highlightUids.add(slot.uid);
+    }
+  }
+
   /** Select these tiles (a multiset), e.g. to show a suggested pass or discard. */
   selectTiles(tiles) {
     this.selected.clear();
@@ -100,7 +110,7 @@ export class Rack {
       const classes = [
         this.selected.has(slot.uid) && 'is-selected',
         this.fresh.has(slot.uid) && 'is-fresh',
-        this.highlight.has(slot.tile) && 'is-highlight',
+        (this.highlight.has(slot.tile) || this.highlightUids.has(slot.uid)) && 'is-highlight',
       ].filter(Boolean).join(' ');
       const el = tileEl(slot.tile, { size: 'lg', button: true, className: classes });
       el.dataset.uid = String(slot.uid);
@@ -118,7 +128,11 @@ export class Rack {
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       start = { x: e.clientX, y: e.clientY, dragging: false, id: e.pointerId };
-      el.setPointerCapture(e.pointerId);
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        // The pointer may already be gone (fast taps on some touch devices); dragging just won't capture.
+      }
     });
     el.addEventListener('pointermove', (e) => {
       if (!start || e.pointerId !== start.id) return;

@@ -73,7 +73,7 @@ export function checkPassChoice(hand, choice, blindAllowed) {
 
 /**
  * Resolve one simultaneous pass round.
- * A player who blinds k tiles forwards the first k tiles they receive, unseen, and keeps the rest.
+ * A player who blinds k tiles forwards the first k tiles they receive (in tile order), unseen, and keeps the rest.
  * Forwarded tiles are traced back to whoever passed them from their own hand. If all four
  * players blind all 3, no tile leaves anyone's hand, so nothing moves.
  * @param {number[][]} hands  Indexed by seat.
@@ -85,7 +85,9 @@ export function checkPassChoice(hand, choice, blindAllowed) {
  */
 export function resolvePass(hands, direction, choices, blindAllowed = false) {
   choices.forEach((c, seat) => checkPassChoice(hands[seat], c, blindAllowed));
-  const own = choices.map((c) => c.tiles);
+  // Passed tiles go in a fixed order, so which tiles a blind passer forwards (the first ones
+  // received) doesn't depend on the order the sender happened to pick them.
+  const own = choices.map((c) => c.tiles.slice().sort((a, b) => a - b));
   const blind = choices.map((c) => c.blind ?? 0);
 
   if (own.every((t) => t.length === 0)) {

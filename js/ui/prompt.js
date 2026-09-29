@@ -61,7 +61,8 @@ export function renderPrompt(el, obs, rack, ctx) {
         blindPicker,
         h('div', { class: 'prompt-row' },
           h('span', { class: 'prompt-hint' }, need ? `Select ${need} tile${need > 1 ? 's' : ''} (${chosen.length}/${need}). Jokers can’t be passed.` : 'Passing 3 unseen tiles.'),
-          button('Pass', () => { ctx.act({ type: 'pass', tiles: chosen, blind }); ui.blind = 0; }, { variant: 'primary', disabled: chosen.length !== need })));
+          // Reset first: passing may complete the round and render the next one synchronously.
+          button('Pass', () => { ui.blind = 0; ctx.act({ type: 'pass', tiles: chosen, blind }); }, { variant: 'primary', disabled: chosen.length !== need })));
       return;
     }
     case 'vote':
@@ -133,7 +134,7 @@ export function renderPrompt(el, obs, rack, ctx) {
               button('+', () => { ui.claimJokers = { ...ui.claimJokers, [key]: jokers + 1 }; ctx.rerender(); }, { disabled: jokers >= o.maxJokers }))
             : h('span', { class: 'prompt-hint' }, jokers ? `uses ${jokers} joker${jokers > 1 ? 's' : ''}` : '');
           buttons.push(h('span', { class: 'claim-opt' },
-            tag(button(`Call ${groupName(o.count)}`, () => { ctx.act({ type: 'claim', call: 'expose', count: o.count, jokers }); ui.claimJokers = {}; }, { variant: 'primary' }), { type: 'claim', call: 'expose', count: o.count }),
+            tag(button(`Call ${groupName(o.count)}`, () => { ui.claimJokers = {}; ctx.act({ type: 'claim', call: 'expose', count: o.count, jokers }); }, { variant: 'primary' }), { type: 'claim', call: 'expose', count: o.count }),
             stepper));
         }
       }

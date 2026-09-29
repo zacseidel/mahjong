@@ -376,7 +376,15 @@ The site's main audience is new players, so the tips teach as well as advise.
 - Tile names are unambiguous for beginners: winds are "North Wind", not "North".
 - Danger marks appear only once some opponent is at medium or high threat; low-threat opponents don't make a tile dangerous (§10.5 "threatening opponent"). Early in a hand every tile would otherwise look risky.
 
-### 10.8 Implementation notes
+### 10.8 The guided hand
+A short tutorial hand for first-time players (`js/engine/tutorial.js`), started from the welcome dialog, the top bar ("Guided hand"), or `index.html#tutorial` (linked from Learn).
+- Fixed deal (a seed) on the practice card, Beginner opponents, default rules, training wheels, tips and step explanations on. The player's own settings, card, running totals, and next dealer are set aside and restored afterward, and the hand isn't recorded in stats.
+- The player must make the suggested move each time (anything else gets a gentle nudge instead of being applied), so the deterministic opponents make the hand unfold the same way every time. Suggested tiles are highlighted (exactly the copies to use) for the player to tap; suggested buttons are highlighted.
+- Lesson notes explain moments the first time they happen: the start, a blind pass, the halfway vote, the start of play, an opponent's exposure, your own call, a joker exchange, danger marks appearing, and Mah Jongg.
+- The deal was chosen by simulation so the hand shows a full Charleston with blind passes, an opponent's exposure, the player's calls, a joker exchange, and a self-drawn win in about ten discards. `test/tutorial.test.js` replays it; if AI, tips, or card changes alter the story, the test fails and a new seed must be chosen.
+- When no hand on the card can still be completed, tips say so plainly and suggest defense (pass on calls; throw safe tiles), and closest hands show the nearest hands marked dead.
+
+### 10.9 Implementation notes
 - `defense.js` and `tips.js` take only observations. Tuning constants live in `DEFENSE` (defense.js) and `WEIGHTS` (evaluator.js).
 - Offense tips use the intermediate AI's weighting, with ties broken deterministically, so the same situation always gets the same tip.
 - The post-hand review compares each human discard with `recommendedDiscard` (the fold tip when folding is advised, otherwise the offense discard tip).

@@ -9,6 +9,8 @@ import { showEndOfHand, showCard, showSettings, showOpponent, openModal, closeMo
 import { nameOf, windOf } from './format.js';
 import { loadCards, saveCards, loadSettings, saveSettings, loadLedger, saveLedger, loadFlags, setFlag } from '../storage.js';
 import { makeRecord, appendRecord } from '../ledger.js';
+import { TUTORIAL, requiredAction, lessonNote } from '../engine/tutorial.js';
+import { sameAction, describeAction } from '../engine/actions.js';
 import { PRACTICE_ID, getCard, setActive, putCard, importCard, playableHands } from '../cardStore.js';
 
 const app = document.getElementById('app');
@@ -84,6 +86,8 @@ const sessionId = new Date().toISOString();
 let handTipsOn = false;
 let ledgerWarned = false;
 let lastState = null;
+/** The guided hand, when active: notes seen, and what it set aside to restore afterward. */
+let tutorial = null;
 // The tips panel starts open where it fits beside the table, closed where it would overlay it.
 const ui = { blind: 0, claimJokers: {}, sideOpen: window.matchMedia('(min-width: 1101px)').matches, highlightHand: null };
 
@@ -114,6 +118,7 @@ function render() {
   mount(myHead,
     h('span', { class: 'opp-name' }, 'You'),
     h('span', { class: 'wind-badge' }, windOf(human, obs.dealer)),
+    tutorial ? h('span', { class: 'badge badge-guide' }, 'Guided hand') : null,
     obs.dead[human] ? h('span', { class: 'badge badge-dead' }, 'Dead') : null,
     h('span', { class: 'score' }, `Session: ${session.totals[human] >= 0 ? '+' : ''}${session.totals[human]}`));
   layout.me.classList.toggle('is-turn', obs.turnSeat === human);
@@ -122,6 +127,19 @@ function render() {
   // "Show me" highlights last only for the decision they were made for.
   const key = `${obs.log.length}:${obs.decision?.kind ?? ''}`;
   if (ui.showMe && ui.showMe.key !== key) ui.showMe = null;
+  // Guided hand: the required move is highlighted, and a lesson note may explain the moment.
+  let required = null;
+  ui.tutorial = null;
+  if (tutorial && obs.decision && obs.phase !== 'end') {
+    required = requiredAction(obs);
+    const note = lessonNote(obs, tutorial.seen, { nameOf: (s) => nameOf(s, human) });
+    ui.tutorial = { required, note, dismiss: () => { if (note) tutorial.seen.add(note.id); render(); } };
+    ui.showMe = { key, action: required };
+    if (ui.tutorialKey !== key) {
+      ui.tutorialKey = key;
+      if (required?.type === 'pass') ui.blind = required.blind ?? 0;
+    }
+  }
   renderPrompt(promptEl, obs, rack, { act: humanAct, ui, rerender: render, thinking });
   const coachEl = hooks.coach?.(obs, session, ui, rack, render);
   if (coachEl) promptEl.firstChild ? promptEl.firstChild.after(coachEl) : promptEl.append(coachEl);
@@ -129,6 +147,12 @@ function render() {
   rack.highlight = new Set();
   rack.marks = new Map();
   hooks.decorate?.(obs, rack, ui);
+  rackEl.classList.toggle('guided', !!required);
+  rack.highlightUids = new Set();
+  if (required && ['pass', 'courtesyPass', 'discard'].includes(required.type)) {
+    rack.highlight = new Set();
+    rack.highlightExactly(required.type === 'discard' ? [required.tile] : required.tiles);
+  }
   rack.render();
   if (hooks.renderSide && ui.sideOpen) hooks.renderSide(layout.side, obs, session, ui, render, humanAct);
   app.classList.toggle('side-closed', !ui.sideOpen || !hooks.renderSide);
@@ -136,6 +160,14 @@ function render() {
 
 function humanAct(action) {
   const obs = session.observation();
+  if (tutorial && obs.phase !== 'end') {
+    const required = requiredAction(obs);
+    if (required && !sameAction(action, required)) {
+      toast(`In the guided hand, make the suggested move: ${describeAction(required)}.`);
+      return;
+    }
+    if (ui.tutorial?.note) tutorial.seen.add(ui.tutorial.note.id);
+  }
   if (settings.tips.offense || settings.tips.defense) handTipsOn = true;
   hooks.onHumanAction?.(obs, action);
   const error = session.act(action);
@@ -166,23 +198,75 @@ function recordHand(record) {
 }
 
 function onEnd(record) {
-  recordHand(record);
+  const guided = !!tutorial;
+  if (!guided) recordHand(record); // the guided hand isn't a real hand; keep it out of stats
   render();
+  const outro = guided ? h('section', { class: 'lesson' },
+    h('h3', {}, 'You finished the guided hand!'),
+    h('p', {}, 'You passed tiles in the Charleston (including blind passes), called discards to expose groups, swapped a real tile for a joker, watched an opponent’s exposure, and won with a tile you drew yourself.'),
+    h('p', {}, 'Next, play a real hand. The coach still explains each step and suggests moves, but the choices are yours. Replay the guided hand any time from the top bar.')) : null;
   // Let the final discard or Mah Jongg show for a moment before the review.
   setTimeout(() => showEndOfHand(record, session.state, session, {
-    onNext: () => session.newHand(),
-    onReplay: () => session.replay(),
-    extra: hooks.endExtra?.(record, session) ?? null,
+    onNext: () => { exitTutorial(); session.newHand(); },
+    onReplay: () => (guided ? startTutorial() : session.replay()),
+    extra: h('div', {}, outro, hooks.endExtra?.(record, session) ?? null),
   }), 700);
 }
 
-function confirmNewHand() {
-  if (!session.state || session.state.phase === 'end') return session.newHand();
-  openModal('Start a new hand?', [
-    h('p', {}, 'The current hand will be abandoned and won’t count.'),
+/** Start (or restart) the guided first hand. */
+async function startTutorial() {
+  closeModal();
+  let practice;
+  try {
+    practice = await loadPractice();
+  } catch (e) {
+    return toast(e.message);
+  }
+  if (!tutorial) {
+    tutorial = { saved: { settings: session.settings, card: session.card, cardId: session.cardId, totals: session.totals.slice(), nextDealer: session.nextDealer } };
+  }
+  tutorial.seen = new Set();
+  session.settings = {
+    ...settings,
+    humanSeat: TUTORIAL.human,
+    levels: [...TUTORIAL.levels],
+    trainingWheels: true,
+    rules: {},
+    tips: { offense: true, defense: true },
+    explain: true,
+    speed: settings.speed === 'instant' ? 'normal' : settings.speed,
+  };
+  session.card = practice;
+  session.cardId = PRACTICE_ID;
+  session.newHand({ seed: TUTORIAL.seed, dealer: TUTORIAL.dealer });
+}
+
+/** Leave the guided hand and restore the player's own settings, card, and totals. */
+function exitTutorial() {
+  if (!tutorial) return;
+  const s = tutorial.saved;
+  Object.assign(session, { settings: s.settings, card: s.card, cardId: s.cardId, totals: s.totals, nextDealer: s.nextDealer });
+  tutorial = null;
+}
+
+function confirmTutorial() {
+  if (!session.state || session.state.phase === 'end' || tutorial) return startTutorial();
+  openModal('Start the guided hand?', [
+    h('p', {}, 'A short hand where the coach walks you through every step. The current hand will be abandoned and won’t count.'),
     h('div', { class: 'modal-actions' },
       button('Keep playing', () => closeModal()),
-      button('New hand', () => { closeModal(); session.newHand(); }, { variant: 'primary' })),
+      button('Start the guided hand', startTutorial, { variant: 'primary' })),
+  ]);
+}
+
+function confirmNewHand() {
+  const fresh = () => { exitTutorial(); session.newHand(); };
+  if (!session.state || session.state.phase === 'end') return fresh();
+  openModal(tutorial ? 'Leave the guided hand?' : 'Start a new hand?', [
+    h('p', {}, tutorial ? 'You can come back to it any time with Guided hand.' : 'The current hand will be abandoned and won’t count.'),
+    h('div', { class: 'modal-actions' },
+      button('Keep playing', () => closeModal()),
+      button('New hand', () => { closeModal(); fresh(); }, { variant: 'primary' })),
   ]);
 }
 
@@ -245,7 +329,10 @@ function begin(card, cardId = loadCards().activeId) {
   settings = loadSettings();
   session = new Session({ card, settings, onChange: render, onEnd });
   session.cardId = cardId;
-  if (!loadFlags().welcomed) showWelcome();
+  if (location.hash === '#tutorial') {
+    setFlag('welcomed');
+    startTutorial();
+  } else if (!loadFlags().welcomed) showWelcome();
   buildTopbar();
   session.newHand();
 }
@@ -261,10 +348,10 @@ function showWelcome() {
       h('li', {}, h('strong', {}, 'Words. '), 'Underlined words like pung or exposure: tap them for a quick definition.'),
       h('li', {}, h('strong', {}, 'Tips panel. '), 'Your closest hands, laid out tile by tile, and which of your tiles are risky to throw. On a smaller screen, tap Tips to open it.'),
       h('li', {}, h('strong', {}, 'After each hand. '), 'See how the hand was won and compare your choices with the tips.')),
-    h('p', {}, 'Your opponents start at Beginner; change them in Settings when you’re ready. New to the game? The ', h('a', { href: 'learn.html' }, 'Learn page'), ' takes about ten minutes.'),
+    h('p', {}, 'New to the game? Start with the ', h('strong', {}, 'guided hand'), ': a short hand where the coach walks you through every step, from the Charleston to Mah Jongg. The ', h('a', { href: 'learn.html' }, 'Learn page'), ' covers the rules in about ten minutes. Your opponents start at Beginner.'),
     h('div', { class: 'modal-actions' },
-      h('a', { class: 'btn', href: 'learn.html' }, 'Read Learn first'),
-      button('Start playing', closeModal, { variant: 'primary' })),
+      button('Just play', closeModal),
+      button('Take the guided hand', startTutorial, { variant: 'primary' })),
   ]);
 }
 
@@ -272,6 +359,7 @@ function buildTopbar() {
   const bar = document.getElementById('topbar-actions');
   mount(bar,
     button('New hand', confirmNewHand),
+    button('Guided hand', confirmTutorial, { title: 'A short hand where the coach walks you through every step' }),
     button('Card', () => showCard(session.state?.card ?? session.card)),
     hooks.renderSide ? button('Tips', () => { ui.sideOpen = !ui.sideOpen; render(); }) : null,
     button('Settings', () => showSettings(session.settings, {
@@ -281,6 +369,11 @@ function buildTopbar() {
     h('a', { class: 'btn', href: 'stats.html' }, 'Stats'),
     h('a', { class: 'btn', href: 'card.html' }, 'My cards'),
     h('a', { class: 'btn', href: 'learn.html' }, 'Learn'));
+}
+
+// Debugging aid: with ?debug in the URL, expose the session for the browser console.
+if (new URLSearchParams(location.search).has('debug')) {
+  window.__mj = { get session() { return session; }, get tutorial() { return tutorial; } };
 }
 
 export async function start() {
