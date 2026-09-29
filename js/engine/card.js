@@ -302,10 +302,13 @@ export function expandCard(card) {
  * (same tile, same size); a concealed target takes no exposures.
  * @param {Target} target
  * @param {Exposure[]} exposures
- * @returns {Int8Array|null}  Per-tile group counts left for concealed tiles, or null if they don't fit.
+ * @returns {Int8Array|null}  Per-tile group counts left for concealed tiles, or null if they don't
+ *   fit. Treat it as read-only: with no exposures it is the target's own array.
  */
 export function fitExposures(target, exposures) {
-  if (target.concealed && exposures.length) return null;
+  if (exposures.length === 0) return target.group;
+  if (target.concealed) return null;
+  for (const e of exposures) if (target.group[e.tile] < e.count) return null; // cheap reject
   const group = Int8Array.from(target.group);
   const unused = target.groups.slice();
   for (const e of exposures) {
@@ -325,11 +328,14 @@ export function fitExposures(target, exposures) {
  * @returns {boolean}
  */
 export function matchTarget(target, { concealed, exposures = [] }) {
+  const total = exposures.reduce((n, e) => n + e.count, concealed.length);
+  return total === HAND_SIZE && matchCounts(target, toCounts(concealed), exposures);
+}
+
+/** matchTarget for a hand already known to hold 14 tiles, with concealed tiles as counts. */
+function matchCounts(target, counts, exposures) {
   const group = fitExposures(target, exposures);
   if (!group) return false;
-  const total = exposures.reduce((n, e) => n + e.count, concealed.length);
-  if (total !== HAND_SIZE) return false;
-  const counts = toCounts(concealed);
   for (let t = 0; t < KINDS; t++) {
     if (t === JOKER) continue;
     if (counts[t] < target.single[t] || counts[t] > target.single[t] + group[t]) return false;
@@ -346,9 +352,11 @@ export function matchTarget(target, { concealed, exposures = [] }) {
  */
 export function matchHand(card, hand) {
   const exposures = hand.exposures ?? [];
-  const jokerless = !hand.concealed.includes(JOKER) && exposures.every((e) => e.jokers === 0);
+  if (exposures.reduce((n, e) => n + e.count, hand.concealed.length) !== HAND_SIZE) return [];
+  const counts = toCounts(hand.concealed);
+  const jokerless = counts[JOKER] === 0 && exposures.every((e) => e.jokers === 0);
   return expandCard(card)
-    .filter((t) => matchTarget(t, hand))
+    .filter((t) => matchCounts(t, counts, exposures))
     .sort((a, b) => b.value - a.value)
     .map((target) => ({ target, jokerless }));
 }

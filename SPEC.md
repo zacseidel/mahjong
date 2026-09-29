@@ -62,6 +62,7 @@ Before play, players pass tiles. Each pass is exactly 3 tiles. **Jokers may neve
 
 1. **First Charleston (mandatory):** pass right, then across, then left.
    - The final pass (left) may be a **blind pass**: a player may pass on 1–3 of the tiles just received without looking at them, making up the rest of the 3 from their own hand.
+   - Passes in a round are simultaneous. A blind passer forwards the first 1–3 tiles they receive and keeps the rest; forwarded tiles are traced back to whoever passed them from their own hand, so blind passes can chain around the table. If all four players blind all 3, no tile leaves anyone's hand and nothing moves.
 2. **Second Charleston (optional):** any player may stop it before it starts. If played: left, then across, then right. The final pass (right) may be blind.
 3. **Courtesy pass (optional):** each pair of players sitting across from each other agree to trade 0–3 tiles. The smaller number requested is used. **[verify]**
 
@@ -93,7 +94,8 @@ AI opponents decide whether to stop the second Charleston (§9). The UI offers t
 ### 4.6 Mah Jongg
 - A winning hand is exactly 14 tiles (exposed plus concealed) matching one concrete instantiation of one hand on the loaded card (§5), with all joker placements legal and all exposures consistent with that hand.
 - Default ("training wheels on"): the Mah Jongg button is enabled only when the engine confirms a valid hand.
-- "Training wheels off": the button is always enabled; a false Mah Jongg makes that player's hand dead. Official penalties for false Mah Jongg are more detailed; v1 uses this simplification. **[verify]**
+- "Training wheels off": the button is always enabled; a false Mah Jongg makes that player's hand dead. Official penalties for false Mah Jongg are more detailed; v1 uses this simplification. **[verify]** The dead player keeps their 14 tiles and play passes to the next player, who draws. With `falseMahJongg: 'retract'`, nothing happens and the player continues their turn. False Mah Jongg can only be declared on your own turn; the claim window offers Mah Jongg only when it is valid.
+- A win on the dealt 14 tiles (East, before discarding) counts as self-drawn. If a player calls a discard for an exposure and then has Mah Jongg (for example after a joker exchange), it scores as a win on that discard.
 
 ### 4.7 Dead hands
 - A player's hand is dead if their exposures can't fit any hand on the loaded card, or their tile count is wrong.
@@ -227,6 +229,9 @@ The states are:
 - The engine emits an **event log** (deal, pass, draw, discard, call, expose, exchange, dead, mahjong, wallgame, settle). The UI renders from state plus events. The log also drives post-hand review.
 - **Claim window:** after each discard, every non-discarding, non-dead player gets a chance to claim. The engine computes each player's legal claims first. The human is **only prompted when they have a legal claim**. AI players answer instantly.
 - A seed plus the list of human decisions reproduces a hand exactly ("replay this deal").
+- **Driver model:** the engine never calls a player. `pending(state)` lists the decisions it is waiting for (several seats at once during Charleston rounds and claim windows), each with its legal options. `act(state, seat, action)` validates and applies one decision, throwing on anything illegal, and records it in `state.actions`. `replay(options, actions)` rebuilds the hand. The UI, the AI (through observations), and tests all drive the game this way.
+- Test and drill hooks on `newGame`: `wallTiles` (a preset 152-tile order instead of a shuffle) and `charleston: false`.
+- The event log holds full information, including concealed tiles, for post-hand review. Players and AI see only `observe()` output (§8).
 
 ---
 
@@ -387,6 +392,9 @@ All but point display (a UI setting) are keys in `rules-config.js` (§4.9).
 | Discarder pays for all when throwing to an obvious hand **[verify, house rule]** | off |
 | Wall-game payment **[house rule]** | off |
 
+- "Obvious hand" means the winner has 3 or more exposures (the same threshold as high threat in §10.4). With the rule on, the discarder pays everyone's share and the other two pay nothing. **[verify]**
+- Wall-game payment is not defined yet, so the setting has no effect in v1. Define it or remove it before the settings UI (stage 9).
+
 ### 11.3 Ledger and stats
 Every hand record stores: timestamp, seed, card id, winner, winning hand id, value, jokerless, selfDrawn, discarder, payments, whether tips were on, and the human's decisions (for replay).
 
@@ -469,7 +477,7 @@ Use only practice-card hands in examples.
 1. `rng`, `tiles`, `wall`: tile ids, seeded shuffle, deal. Tests: 152 tiles, correct counts, deterministic by seed.
 2. `card`: parse notation, compile, expand, match a 14-tile hand. Tests: every parse rule in §5.3, color permutations, shift bounds, dragon pairing, soap as zero, jokers rejected in pairs and singles, concealed rules, invented test hands only. Practice-card validation test.
 3. `rules`: joker exchanges, legal calls, dead-hand checks. Tests for each rule in §4.
-4. `charleston` and `game`: the full state machine, the event log, the claim window, and `scoring`. Simulation test: 1,000 seeded all-AI games with invariants checked every turn (tile conservation, hand sizes 13/14, no jokers passed, no illegal calls, settlements sum to zero).
+4. `charleston` and `game`: the full state machine, the event log, the claim window, and `scoring`. Simulation test: 1,000 seeded all-AI games (until stage 5, a simple test-only bot policy stands in for the AI) with invariants checked every turn (tile conservation, hand sizes 13/14, no jokers passed, no illegal calls, settlements sum to zero).
 5. `observe`, `evaluator`, then the beginner and intermediate AI. The information-hiding test.
 6. UI: game screen, rack, discards, claim bar, Charleston.
 7. Tips (offense, then defense), `learn.html`.
