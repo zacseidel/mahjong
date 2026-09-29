@@ -157,6 +157,7 @@ The §11.2 scoring house rules live in the same rules object.
   - `"shift"`: all digits shift together by the same amount, staying within 1–9. This covers both "any consecutive" and "any like numbers."
 - `value`: points.
 - `concealed`: true for C hands, false for X hands.
+- `lowest` (optional, only with `"shift"`): the values the hand's lowest printed number may take, e.g. `[2, 4, 6, 8]` for a like-numbers hand limited to even kongs. Without it, every shift that stays within 1–9 is allowed.
 - `pattern` (optional): the advanced compiled-group form (§5.3). When present, it is used for matching instead of `line`, and `line` is kept only for display.
 - The engine compiles each hand into a pattern of groups; apart from an advanced `pattern`, the compiled form is internal and is not stored.
 
@@ -173,6 +174,8 @@ Groups are separated by spaces.
   - `D`: dragon, with the dragon determined by its color (below).
 - **Color suffix:** `g`, `r`, or `b` after a token gives the color printed on the card. Colors are **suit variables**, not specific suits. Different colors mean different suits; the same color means the same suit. Numbers and `D` need a color; `F`, winds, and `0` don't.
 - **Dragons:** a `D` in a color takes the dragon paired (§3) with whatever suit that color is assigned.
+- **Any suit:** the suffix `x` gives a group its own suit, chosen freely and allowed to match any other group's suit. `DDDx` is a pung of any dragon; `5555x 5555x` is two kongs of 5s in any suits, the same or different.
+- **Alternatives:** `a/b` in one group means the group is either `a` or `b` (each with its own color suffix), e.g. `2222g/6666g`. Alternatives in different groups combine freely, every combination must make 14 tiles (anything else is treated as a typo), and there may be at most 64 combinations. A hand printed as two versions ("-or-") is entered as two hands.
 - **Expansion:** assign distinct suits to the colors in every possible way (up to 6 permutations for 3 colors), and apply number shifts if `numbers` is `"shift"`. Discard instantiations that need more copies of a tile than exist (without jokers for pairs and singles).
 
 Edge cases the notation can't express are handled by an **advanced JSON editor** in the card editor (§12), which accepts compiled groups directly:
@@ -183,7 +186,7 @@ Edge cases the notation can't express are handled by an **advanced JSON editor**
   "constraints": { "n": [1, 8] } }
 ```
 
-In this format, `tile` is a digit 1–9, a number variable (one lowercase letter, with an optional `+k` or `-k`), or `0`, `F`, `N`, `E`, `W`, `S`, `D`. Numbers and `D` need a `suit` variable, and different suit variables mean different suits. Number variables range over 1–9 unless `constraints` narrows them, and instantiations with a rank outside 1–9 are dropped.
+In this format, `tile` is a digit 1–9, a number variable (one lowercase letter, with an optional `+k` or `-k`), or `0`, `F`, `N`, `E`, `W`, `S`, `D`. Numbers and `D` need a `suit`: a variable name (different names mean different suits) or `"*"` for any suit. Number variables range over 1–9 unless `constraints` narrows them, as `[low, high]`, `{"from": low, "to": high}`, or `{"oneOf": [values]}`; instantiations with a rank outside 1–9 are dropped.
 
 The notation is the primary input; the compiled-group format is the fallback.
 

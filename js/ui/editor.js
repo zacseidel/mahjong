@@ -8,7 +8,7 @@ import { openModal, closeModal } from './modals.js';
 import { loadCards, saveCards, storageAvailable, loadFlags, setFlag } from '../storage.js';
 import {
   PRACTICE_ID, CATEGORY_SUGGESTIONS, blankCard, getCard, putCard, removeCard, setActive, copyOfCard,
-  addHand, updateHand, removeHand, duplicateHand, moveHand, exportCard, exportFileName, importCard, previewHand,
+  addHand, updateHand, removeHand, duplicateHand, moveHand, exportCard, exportFileName, importCard, previewHand, parseLowest,
 } from '../cardStore.js';
 import { validateCard } from '../engine/card.js';
 
@@ -137,6 +137,11 @@ function handForm(index) {
     h('option', { value: 'X', selected: !draft.concealed }, 'X — exposed'),
     h('option', { value: 'C', selected: draft.concealed }, 'C — concealed'));
   const value = h('input', { type: 'number', inputmode: 'numeric', min: '1', step: '1', value: String(draft.value ?? ''), 'aria-label': 'Value' });
+  const lowest = h('input', { type: 'text', inputmode: 'numeric', value: (draft.lowest ?? []).join(', '), placeholder: 'e.g. 2, 4, 6, 8', 'aria-label': 'Lowest number limited to' });
+  const lowestField = h('label', { class: 'field-stack' },
+    h('span', {}, 'Lowest number limited to (optional)'), lowest,
+    h('span', { class: 'muted small' }, 'For notes like “like kongs 2, 4, 6 or 8”: type the line as printed, and list which numbers its lowest number may be.'));
+  const syncLowest = () => { lowestField.hidden = numbers.value !== 'shift'; };
   const notes = h('input', { type: 'text', value: draft.notes ?? '', 'aria-label': 'Notes', placeholder: 'e.g. Any 3 consecutive numbers' });
   const advanced = h('textarea', { rows: '7', spellcheck: 'false', 'aria-label': 'Advanced pattern JSON' });
   advanced.value = draft.pattern ? JSON.stringify(draft.pattern, null, 2) : '';
@@ -145,6 +150,8 @@ function handForm(index) {
   function current() {
     let pattern;
     let patternError = null;
+    const low = numbers.value === 'shift' ? parseLowest(lowest.value) : null;
+    if (low?.error) patternError = low.error;
     const text = advanced.value.trim();
     if (text) {
       try { pattern = JSON.parse(text); } catch { patternError = 'The advanced pattern isn’t valid JSON.'; }
@@ -158,6 +165,7 @@ function handForm(index) {
         value: value.value === '' ? NaN : Number(value.value),
         concealed: concealed.value === 'C',
         notes: notes.value,
+        ...(Array.isArray(low) ? { lowest: low } : {}),
         ...(pattern ? { pattern } : {}),
       },
       patternError,
@@ -179,7 +187,8 @@ function handForm(index) {
       ...p.examples.map((ex) => h('div', { class: 'example' }, tileRow(ex.layout.flatMap(({ tile, count }) => Array(count).fill(tile)), { size: 'sm' }), h('span', { class: 'muted' }, ex.text))),
       !Number.isInteger(hand.value) || hand.value <= 0 ? h('p', { class: 'error' }, 'Enter a value (points).') : null);
   }
-  for (const el of [category, line, numbers, concealed, value, notes, advanced]) el.addEventListener('input', update);
+  for (const el of [category, line, numbers, concealed, value, notes, advanced, lowest]) el.addEventListener('input', update);
+  numbers.addEventListener('change', () => { syncLowest(); update(); });
 
   const save = () => {
     const { hand, patternError } = current();
@@ -200,24 +209,29 @@ function handForm(index) {
         h('li', {}, 'Add the printed color after numbers and dragons: ', h('code', {}, 'g'), ' green, ', h('code', {}, 'r'), ' red, ', h('code', {}, 'b'), ' blue. Same color = same suit.'),
         h('li', {}, h('code', {}, 'D'), ' is the dragon of its color’s suit; ', h('code', {}, '0'), ' is Soap; ', h('code', {}, 'F'), ' flower; ', h('code', {}, 'N E W S'), ' winds.'),
         h('li', {}, 'Mixed characters are single tiles: ', h('code', {}, '2026g'), ' is 2, Soap, 2, 6.'),
+        h('li', {}, 'A group that may be one of several: separate them with ', h('code', {}, '/'), '. ', h('code', {}, '2222g/6666g'), ' is a kong of 2s or of 6s.'),
+        h('li', {}, 'Any suit, even one already used: end the group with ', h('code', {}, 'x'), '. ', h('code', {}, 'DDDx'), ' is any dragon.'),
+        h('li', {}, 'If the card prints two versions of a hand (“-or-”), add each as its own hand. The Copy button helps.'),
         h('li', {}, 'Example: ', cardLine('FF 111g 222g 3333r DDr')))),
     h('div', { class: 'form-grid' },
       h('label', { class: 'field-stack' }, h('span', {}, 'Category'), category),
       h('label', { class: 'field-stack' }, h('span', {}, 'Value'), value),
       h('label', { class: 'field-stack' }, h('span', {}, 'Numbers'), numbers),
       h('label', { class: 'field-stack' }, h('span', {}, 'Exposed or concealed'), concealed)),
+    lowestField,
     h('label', { class: 'field-stack' }, h('span', {}, 'Notes (optional)'), notes),
     h('h3', {}, 'Preview'),
     preview,
     h('details', { class: 'advanced', open: !!draft.pattern },
       h('summary', {}, 'Advanced: enter groups as JSON'),
-      h('p', { class: 'muted small' }, 'For hands the line notation can’t express. When filled in, this is used instead of the line (the line is still shown on the card). Example: ',
+      h('p', { class: 'muted small' }, 'For hands the line notation can’t express. When filled in, this is used instead of the line (the line is still shown on the card). "suit" names are suit variables (different names, different suits; "*" for any suit). Constraints can be [low, high] or {"oneOf": [2, 4, 6, 8]}. Example: ',
         h('code', {}, '{"groups":[{"tile":"n","suit":"A","count":4},{"tile":"n+1","suit":"A","count":4},{"tile":"F","count":2},{"tile":"D","suit":"B","count":4}],"constraints":{"n":[1,8]}}')),
       advanced),
     h('div', { class: 'modal-actions' },
       button('Cancel', closeModal),
       button(index >= 0 ? 'Save hand' : 'Add hand', save, { variant: 'primary' })),
   ], { wide: true });
+  syncLowest();
   update();
   line.focus();
 }
@@ -308,7 +322,7 @@ function handTable(card) {
       h('div', { class: 'hand-main' },
         cardLine(hand.line),
         h('span', { class: 'hand-val' }, `${hand.value} ${hand.concealed ? 'C' : 'X'}`),
-        hand.numbers === 'shift' ? h('span', { class: 'tag' }, 'any numbers') : null,
+        hand.numbers === 'shift' ? h('span', { class: 'tag' }, hand.lowest ? `lowest ${hand.lowest.join('/')}` : 'any numbers') : null,
         hand.pattern ? h('span', { class: 'tag' }, 'advanced') : null,
         hand.notes ? h('span', { class: 'muted' }, hand.notes) : null,
         err ? h('span', { class: 'error' }, err) : null),

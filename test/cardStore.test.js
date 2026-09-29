@@ -171,3 +171,22 @@ test('preview uses an advanced pattern when present', () => {
   assert.equal(p.total, 3);
   assert.match(p.examples[0].text, /D×7/);
 });
+
+test('parseLowest reads lists like “2, 4, 6 or 8”', async () => {
+  const { parseLowest } = await import('../js/cardStore.js');
+  assert.deepEqual(parseLowest('2, 4, 6 or 8'), [2, 4, 6, 8]);
+  assert.deepEqual(parseLowest('6 2 2'), [2, 6]);
+  assert.equal(parseLowest('  '), null);
+  assert.ok(parseLowest('0, 3').error);
+  assert.ok(parseLowest('two').error);
+});
+
+test('lowest survives cleaning, export, and import', () => {
+  const card = addHand(blankCard('Limits'), { category: 'Like', line: '2222g DDDg 2222r DDDr', numbers: 'shift', value: 25, concealed: false, lowest: [2, 4, 6, 8] });
+  assert.deepEqual(card.hands[0].lowest, [2, 4, 6, 8]);
+  const { card: back, errors } = importCard(exportCard(card));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(back.hands[0].lowest, [2, 4, 6, 8]);
+  const p = previewHand(back.hands[0]);
+  assert.equal(p.total, 4 * 3);
+});

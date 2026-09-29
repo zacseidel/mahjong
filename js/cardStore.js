@@ -106,8 +106,24 @@ export function cleanHand(card, hand, index = -1) {
   };
   const notes = String(hand.notes ?? '').trim();
   if (notes) out.notes = notes;
+  if (Array.isArray(hand.lowest) && hand.lowest.length) out.lowest = hand.lowest.slice();
   if (hand.pattern) out.pattern = hand.pattern;
   return out;
+}
+
+/**
+ * Read a "lowest number" list typed by the user, e.g. "2, 4, 6 or 8" → [2, 4, 6, 8].
+ * Returns null for blank input, or {error} if it isn't a list of numbers 1–9.
+ */
+export function parseLowest(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return null;
+  const parts = t.split(/[\s,]+|\bor\b/i).filter(Boolean);
+  const nums = parts.map(Number);
+  if (!nums.length || !nums.every((n) => Number.isInteger(n) && n >= 1 && n <= 9)) {
+    return { error: 'List numbers from 1 to 9, like “2, 4, 6, 8”.' };
+  }
+  return [...new Set(nums)].sort((a, b) => a - b);
 }
 
 export function addHand(card, hand) {

@@ -352,3 +352,93 @@ test('validateCard reports card and hand problems', () => {
   ]);
   assert.equal(errs.find((e) => e.index === 2).pos, 5);
 });
+
+// ---------- Notation extensions: "/" alternatives, "x" any suit, lowest-number limits ----------
+
+test('"/" alternatives: a group may be one of several', () => {
+  const targets = expandHand(hand('FF 2222g/4444g 6666r 8888r'));
+  assert.equal(targets.length, 2 * 6);
+  const firstRanks = new Set(targets.map((t) => rankOf(t.layout[1].tile)));
+  assert.deepEqual([...firstRanks].sort(), [2, 4]);
+  // Alternatives keep their own color: the first group is always a different suit from the rest.
+  for (const t of targets) assert.notEqual(suitOf(t.layout[1].tile), suitOf(t.layout[2].tile));
+  assert.equal(compileHand(hand('FF 2222g/4444g 6666r 8888r')).variants.length, 2);
+});
+
+test('"/" alternatives: every combination must make 14 tiles (catches typos)', () => {
+  // FFF+44444 would be 15 tiles, so the whole line is rejected rather than silently dropping it.
+  assert.throws(() => parseLine('FFF/FF 2222g 4444g/44444g 666g'), /Alternative 2 of this hand has 15 tiles/);
+  // Same-size alternatives in two groups combine freely: 2 × 2 readings.
+  assert.equal(compileHand(hand('FF 2222g/4444g 6666r/8888r 9999b')).variants.length, 4);
+});
+
+test('"/" errors: wrong size in one reading, empty alternatives, positions inside an alternative', () => {
+  throwsAt(() => parseLine('FF 222g/2222g 6666r 8888r'), null, /Alternative 1 of this hand has 13 tiles/);
+  throwsAt(() => parseLine('FF 2222g/ 6666r 8888r'), 9, /empty alternative/);
+  throwsAt(() => parseLine('FF 2222g/44X4g 6666r 8888r'), 11, /Unknown character "X"/);
+});
+
+test('"/" alternatives match either way', () => {
+  const card = { schema: 1, name: 'x', hands: [{ id: 'alt', line: 'FF 2222g/4444g 6666r 8888r', numbers: 'fixed', value: 25, concealed: false }] };
+  assert.equal(matchHand(card, { concealed: parseTiles('F F 2B 2B 2B 2B 6C 6C 6C 6C 8C 8C 8C 8C') }).length, 1);
+  assert.equal(matchHand(card, { concealed: parseTiles('F F 4B 4B 4B 4B 6C 6C 6C 6C 8C 8C 8C 8C') }).length, 1);
+  assert.equal(matchHand(card, { concealed: parseTiles('F F 3B 3B 3B 3B 6C 6C 6C 6C 8C 8C 8C 8C') }).length, 0);
+});
+
+test('"x" means any dragon, including the one matching another group’s suit', () => {
+  const any = expandHand(hand('1111g 2222g 3333g DDx'));
+  assert.equal(any.length, 3 * 3);
+  assert.ok(any.some((t) => t.layout[3].tile === dragonForSuit(suitOf(t.layout[0].tile))), 'matching dragon allowed');
+  assert.ok(any.some((t) => t.layout[3].tile !== dragonForSuit(suitOf(t.layout[0].tile))), 'other dragons allowed');
+  assert.equal(expandHand(hand('1111g 2222g 3333g DDr')).length, 6, 'a colored D must be another suit’s dragon');
+  assert.equal(expandHand(hand('1111g 2222g 3333g DDg')).length, 3, 'same color: the matching dragon');
+});
+
+test('"x" on numbers: any suit, which may repeat another group’s', () => {
+  // Two independent "any suit" kongs of 5s: CC, CB, CD, BB, BD, DD (order doesn't matter).
+  assert.equal(expandHand(hand('5555x 5555x NNN SSS')).length, 6);
+  assert.equal(expandHand(hand('5555g 5555r NNN SSS')).length, 3, 'colors force different suits');
+  const p = compileHand(hand('5555x 5555x NNN SSS'));
+  assert.equal(p.freeVars.length, 2);
+  assert.equal(p.suitVars.length, 0);
+});
+
+test('lowest: limit where an “any numbers” hand may start', () => {
+  const h = hand('2222g DDDg 2222r DDDr', { numbers: 'shift', lowest: [2, 4, 6, 8] });
+  const targets = expandHand(h);
+  assert.equal(targets.length, 4 * 3);
+  assert.deepEqual([...new Set(targets.map((t) => rankOf(t.layout[0].tile)))].sort(), [2, 4, 6, 8]);
+  // Without the limit: any like number.
+  assert.equal(expandHand({ ...h, lowest: undefined }).length, 9 * 3);
+  // The limit applies to the lowest printed number of a run.
+  const run = expandHand(hand('111g 222g 3333g 4444g', { numbers: 'shift', lowest: [1, 6] }));
+  assert.deepEqual([...new Set(run.map((t) => rankOf(t.layout[0].tile)))].sort(), [1, 6]);
+});
+
+test('lowest errors: only with “any numbers”, and only 1–9', () => {
+  assert.throws(() => compileHand(hand('2222g DDDg 2222r DDDr', { lowest: [2] })), /only applies to “any numbers”/);
+  assert.throws(() => compileHand(hand('2222g DDDg 2222r DDDr', { numbers: 'shift', lowest: [0, 2] })), /from 1 to 9/);
+  assert.throws(() => compileHand(hand('2222g DDDg 2222r DDDr', { numbers: 'shift', lowest: [] })), /from 1 to 9/);
+  const errs = validateCard({ schema: 1, name: 'x', hands: [{ id: 'a', line: '2222g DDDg 2222r DDDr', numbers: 'fixed', value: 25, concealed: false, lowest: [2] }] });
+  assert.match(errs[0].message, /only applies/);
+});
+
+test('advanced pattern: "*" for any suit, and oneOf / from-to constraints', () => {
+  const targets = expandPattern(parsePattern({
+    groups: [
+      { tile: 'n', suit: 'A', count: 4 },
+      { tile: 'n', suit: 'B', count: 4 },
+      { tile: 'D', suit: '*', count: 3 },
+      { tile: 'F', count: 3 },
+    ],
+    constraints: { n: { oneOf: [3, 9] } },
+  }));
+  // n ∈ {3, 9}; A≠B (3 unordered pairs, since the two kongs are alike); any of 3 dragons.
+  assert.equal(targets.length, 2 * 3 * 3);
+  const ranged = expandPattern(parsePattern({ groups: [{ tile: 'n', suit: 'A', count: 7 }, { tile: 'N', count: 7 }], constraints: { n: { from: 4, to: 6 } } }));
+  assert.equal(ranged.length, 3 * 3);
+  const bad = (p, re) => assert.throws(() => parsePattern(p), (e) => e instanceof CardError && re.test(e.message));
+  bad({ groups: [{ tile: 'n', suit: 'A', count: 14 }], constraints: { n: { oneOf: [] } } }, /oneOf must list/);
+  bad({ groups: [{ tile: 'n', suit: 'A', count: 14 }], constraints: { n: { from: 5, to: 2 } } }, /within 1–9/);
+  bad({ groups: [{ tile: '5', suit: '*A', count: 14 }] }, /can’t start with "\*"/);
+});
