@@ -1,0 +1,20 @@
+/* stats.html */
+
+.stats { max-width: 980px; margin: 0 auto; padding: 16px 16px 64px; }
+.stats h1 { font-size: 1.8rem; margin: 8px 0 16px; }
+.stats h2 { font-size: 1.2rem; margin: 28px 0 6px; }
+.tiles-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; }
+.stat-num { font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat span:last-child { color: var(--muted); }
+.stats-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; font-variant-numeric: tabular-nums; }
+.stats-table th, .stats-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.stats-table thead th { font-size: 0.85rem; color: var(--muted); }
+.stats-table tbody th { font-weight: 600; }
+.stats-table .help { display: block; font-weight: 400; font-size: 0.82rem; color: var(--muted); }
+.stats-table .me { font-weight: 700; }
+.stats section { overflow-x: auto; }
+.stats-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.notice.warn { padding: 10px 14px; border-left: 4px solid var(--danger-high); background: var(--surface); border-radius: var(--radius); }
+.empty { text-align: center; padding: 40px 0; }
+.small { font-size: 0.85rem; }

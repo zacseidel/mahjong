@@ -182,7 +182,7 @@ export function showSettings(settings, { onChange, extraSections = [] }) {
         return h('div', { class: 'field' }, h('span', {}, label),
           select(rules[key], opts.map((o) => [o, names[o]]), set, text));
       })),
-    h('p', { class: 'muted' }, 'Settings are kept for this visit only for now; saving them comes in a later update.'));
+    h('p', { class: 'muted' }, 'Settings are saved in this browser.'));
   openModal('Settings', body, { wide: true });
 }
 

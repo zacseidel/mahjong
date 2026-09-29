@@ -2,12 +2,13 @@
 
 import { h, mount, button } from './dom.js';
 import { Rack } from './rack.js';
-import { Session, defaultSettings } from './session.js';
+import { Session } from './session.js';
 import { renderOpponent, renderCenter, renderMyExposures } from './table.js';
 import { renderPrompt } from './prompt.js';
 import { showEndOfHand, showCard, showSettings, showOpponent, openModal, closeModal } from './modals.js';
 import { nameOf, windOf } from './format.js';
-import { loadCards, saveCards } from '../storage.js';
+import { loadCards, saveCards, loadSettings, saveSettings, loadFlags, setFlag, loadLedger, saveLedger } from '../storage.js';
+import { makeRecord, appendRecord } from '../ledger.js';
 import { PRACTICE_ID, getCard, setActive, putCard, importCard, playableHands } from '../cardStore.js';
 
 const app = document.getElementById('app');
@@ -77,6 +78,10 @@ export const hooks = {
 
 let session;
 let rack;
+let settings;
+const sessionId = new Date().toISOString();
+let handTipsOn = false;
+let ledgerWarned = false;
 let lastState = null;
 // The tips panel starts open where it fits beside the table, closed where it would overlay it.
 const ui = { blind: 0, claimJokers: {}, sideOpen: window.matchMedia('(min-width: 1101px)').matches, highlightHand: null };
@@ -90,6 +95,7 @@ function render() {
     ui.claimJokers = {};
     ui.highlightHand = null;
     hooks.onNewHand?.();
+    handTipsOn = false;
   }
   const obs = session.observation();
   const human = obs.seat;
@@ -123,13 +129,37 @@ function render() {
 
 function humanAct(action) {
   const obs = session.observation();
+  if (settings.tips.offense || settings.tips.defense) handTipsOn = true;
   hooks.onHumanAction?.(obs, action);
   const error = session.act(action);
   if (error) toast(error);
   else rack.clearSelection();
 }
 
+/** Save the finished hand to the ledger (SPEC §11.3). */
+function recordHand(record) {
+  const state = session.state;
+  const rec = makeRecord({
+    timestamp: new Date().toISOString(),
+    sessionId,
+    seed: record.seed,
+    dealer: record.dealer,
+    human: record.human,
+    cardId: record.cardId ?? PRACTICE_ID,
+    cardName: state.card.name,
+    result: record.result,
+    tipsOn: handTipsOn,
+    fold: hooks.handReport?.()?.fold ?? { suggested: 0, followed: 0 },
+    decisions: state.actions.filter((a) => a.seat === record.human).map((a) => a.action),
+  });
+  if (!saveLedger(appendRecord(loadLedger(), rec)) && !ledgerWarned) {
+    ledgerWarned = true;
+    toast('This browser isn’t saving data, so your stats won’t be kept.');
+  }
+}
+
 function onEnd(record) {
+  recordHand(record);
   render();
   // Let the final discard or Mah Jongg show for a moment before the review.
   setTimeout(() => showEndOfHand(record, session.state, session, {
@@ -161,6 +191,7 @@ function cardChooser() {
       const next = setActive(loadCards(), id);
       if (!saveCards(next)) toast('Couldn’t save your choice in this browser; it applies for this visit only.');
       session.card = id === PRACTICE_ID ? await loadPractice() : getCard(next, id);
+      session.cardId = id;
       toast(`“${session.card.name}” will be used from your next hand.`);
     },
   }, ...options.map(([id, name]) => h('option', { value: id, selected: id === store.activeId }, name)));
@@ -202,9 +233,14 @@ function showNoCard(problem) {
       h('a', { class: 'btn', href: 'card.html' }, 'Open the card editor'))));
 }
 
-function begin(card) {
+function begin(card, cardId = loadCards().activeId) {
   app.replaceChildren(layout.top, layout.left, layout.center, layout.right, layout.me, layout.side);
-  session = new Session({ card, settings: defaultSettings(), onChange: render, onEnd });
+  // Tips default on for a first visit and off for a returning player, unless chosen (SPEC §10).
+  const returning = !!loadFlags().visited;
+  settings = loadSettings({ returning });
+  setFlag('visited');
+  session = new Session({ card, settings, onChange: render, onEnd });
+  session.cardId = cardId;
   buildTopbar();
   session.newHand();
 }
@@ -216,9 +252,10 @@ function buildTopbar() {
     button('Card', () => showCard(session.state?.card ?? session.card)),
     hooks.renderSide ? button('Tips', () => { ui.sideOpen = !ui.sideOpen; render(); }) : null,
     button('Settings', () => showSettings(session.settings, {
-      onChange: render,
+      onChange: () => { saveSettings(session.settings); render(); },
       extraSections: [cardChooser(), ...(hooks.settingsSections?.(session.settings, render) ?? [])],
     })),
+    h('a', { class: 'btn', href: 'stats.html' }, 'Stats'),
     h('a', { class: 'btn', href: 'card.html' }, 'My cards'),
     h('a', { class: 'btn', href: 'learn.html' }, 'Learn'));
 }

@@ -309,7 +309,7 @@ Intermediate plus defense: reads opponents with §10, folds when appropriate, av
 
 ## 10. Tips (toggleable)
 
-Tips are off by default for a returning player and on by default for a first-time player. (Until stage 9 adds saved settings, every visit counts as a first visit, so tips start on.) Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
+Tips are off by default for a returning player and on by default for a first-time player. A returning player is one who has visited before (flag `visited` in `mj.flags.v1`). Once the player turns tips on or off themselves (`tipsChosen`), that choice is saved and always wins. Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
 
 ### 10.1 Offense tips
 - **Closest hands:** the top 3 targets with distance, value, and the tiles still needed. Tap one to highlight the tiles in your rack it uses.
@@ -415,6 +415,8 @@ Every hand record stores: timestamp, seed, card id, winner, winning hand id, val
 
 Session: running net total per player, CSV export.
 
+Implementation: `js/ledger.js` (pure) builds records and computes stats; the ledger is stored under `mj.ledger.v1`, keeping the last 1,000 hands, with the human's decisions kept on the most recent 100 (to limit storage size). A hand counts as "tips on" if tips were on for any of the human's decisions in it. A session is one page visit. Fold-suggestion counts come from the tips module at each human discard. `stats.html` shows the stats, recent sessions and hands, CSV export, and a clear-history button.
+
 Stats for the human, split by tips on and off:
 - win rate;
 - deal-in rate (how often your discard gave someone else Mah Jongg) — the key defensive stat;
@@ -465,7 +467,7 @@ Stats for the human, split by tips on and off:
 - Layout: you at the bottom; the player to your right (next in turn) on the right, across at the top, left on the left. Opponents are named by position (Right, Across, Left) with this hand's wind, since Charleston directions refer to them.
 - The game screen renders from the human's observation (§8) and reveals full hands only after the hand ends. `js/ui/session.js` drives AI seats: simultaneous choices (Charleston, claims) resolve instantly, and AI turn actions wait for the chosen speed.
 - A **Card** button shows the active card, with each line in its printed colors.
-- Until stage 9, settings last only for the visit.
+- Settings are saved under `mj.settings.v1` (`js/settings.js` validates whatever was saved and fills in defaults).
 
 ### 13.3 Tile art
 Generate original SVG tiles in code (`js/ui/tileArt.js`) rather than using third-party art. This avoids licensing questions and covers jokers and flowers, which Riichi-oriented tile sets lack. Numbers with a clear suit symbol and color; honors with a clear letter or symbol. Legible at small sizes. Light and dark themes.

@@ -142,11 +142,18 @@ export function installTips(hooks) {
   hooks.onHumanAction = (obs, action) => {
     if (action.type !== 'discard') return;
     const rec = recommendedDiscard(obs);
-    review.entries.push({ turn: obs.turnNumber, chosen: action.tile, recommended: rec });
+    const fold = defenseTips(obs).fold;
+    review.entries.push({ turn: obs.turnNumber, chosen: action.tile, recommended: rec, fold: fold ? fold.tile : null });
   };
 
   hooks.onNewHand = () => {
     review.entries = [];
+  };
+
+  /** For the ledger: how often the fold suggestion came up this hand, and was followed. */
+  hooks.handReport = () => {
+    const folds = review.entries.filter((e) => e.fold !== null);
+    return { fold: { suggested: folds.length, followed: folds.filter((e) => e.chosen === e.fold).length } };
   };
 
   hooks.endExtra = () => {
@@ -165,9 +172,9 @@ export function installTips(hooks) {
   hooks.settingsSections = (settings, onChange) => [h('section', {},
     h('h3', {}, 'Tips'),
     h('label', { class: 'check' },
-      h('input', { type: 'checkbox', checked: settings.tips.offense, onchange: (e) => { settings.tips.offense = e.target.checked; onChange(); } }),
+      h('input', { type: 'checkbox', checked: settings.tips.offense, onchange: (e) => { settings.tips.offense = e.target.checked; settings.tipsChosen = true; onChange(); } }),
       'Offense tips: closest hands, what to pass, discard, and call'),
     h('label', { class: 'check' },
-      h('input', { type: 'checkbox', checked: settings.tips.defense, onchange: (e) => { settings.tips.defense = e.target.checked; onChange(); } }),
+      h('input', { type: 'checkbox', checked: settings.tips.defense, onchange: (e) => { settings.tips.defense = e.target.checked; settings.tipsChosen = true; onChange(); } }),
       'Defense tips: opponent threat, tile danger, when to fold'))];
 }

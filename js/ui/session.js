@@ -6,21 +6,9 @@ import { newGame, pending, act } from '../engine/game.js';
 import { observe } from '../engine/observe.js';
 import { createAI } from '../engine/ai/index.js';
 import { resolveRules } from '../engine/rules-config.js';
-import { SOUTH, EAST } from '../engine/seats.js';
+import { EAST } from '../engine/seats.js';
 
 export const SPEEDS = Object.freeze({ instant: 0, fast: 250, normal: 600, slow: 1200 });
-
-export function defaultSettings() {
-  return {
-    humanSeat: SOUTH,
-    levels: ['intermediate', 'beginner', 'intermediate', 'beginner'], // per seat; the human's is ignored
-    speed: 'normal',
-    trainingWheels: true,
-    rules: {},
-    tips: { offense: true, defense: true },
-    points: 'points',
-  };
-}
 
 /** A fresh seed. Randomness here is UI-side; the engine only ever uses the seed. */
 export function randomSeed() {
@@ -50,7 +38,7 @@ export class Session {
     clearTimeout(this.timer);
     const s = this.settings;
     this.human = s.humanSeat;
-    this.info = { seed, dealer };
+    this.info = { seed, dealer, cardId: this.cardId };
     this.finished = false;
     this.state = newGame({ seed, card: this.card, rules: resolveRules(s.rules), dealer, trainingWheels: s.trainingWheels });
     this.ais = [0, 1, 2, 3].map((seat) => (seat === this.human ? null : createAI(s.levels[seat], { seat, seed })));
@@ -59,7 +47,7 @@ export class Session {
 
   /** Play the same deal again (same seed and dealer; the human may choose differently). */
   replay() {
-    this.newHand(this.info);
+    this.newHand({ seed: this.info.seed, dealer: this.info.dealer });
   }
 
   /** What the human can see right now. */

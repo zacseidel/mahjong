@@ -3,10 +3,14 @@
 // blocked site data). Card data stays in this browser; nothing here sends it anywhere.
 
 import { normalizeStore } from './cardStore.js';
+import { normalizeSettings } from './settings.js';
+import { normalizeLedger, emptyLedger } from './ledger.js';
 
 export const KEYS = Object.freeze({
   cards: 'mj.cards.v1',
   flags: 'mj.flags.v1',
+  settings: 'mj.settings.v1',
+  ledger: 'mj.ledger.v1',
 });
 
 function storage() {
@@ -70,4 +74,29 @@ export function loadFlags() {
 
 export function setFlag(name, value = true) {
   return writeJSON(KEYS.flags, { ...loadFlags(), [name]: value });
+}
+
+/**
+ * Saved settings merged onto the defaults. A returning player (one who has visited before) gets
+ * tips off by default unless they chose otherwise.
+ */
+export function loadSettings({ returning = false } = {}) {
+  return normalizeSettings(readJSON(KEYS.settings, null), { returning });
+}
+
+export function saveSettings(settings) {
+  return writeJSON(KEYS.settings, settings);
+}
+
+/** Hand history. */
+export function loadLedger() {
+  return normalizeLedger(readJSON(KEYS.ledger, null));
+}
+
+export function saveLedger(ledger) {
+  return writeJSON(KEYS.ledger, ledger);
+}
+
+export function clearLedger() {
+  return writeJSON(KEYS.ledger, emptyLedger());
 }
