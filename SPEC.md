@@ -154,7 +154,8 @@ The §11.2 scoring house rules live in the same rules object.
   - `"shift"`: all digits shift together by the same amount, staying within 1–9. This covers both "any consecutive" and "any like numbers."
 - `value`: points.
 - `concealed`: true for C hands, false for X hands.
-- The engine compiles each hand into a pattern of groups; the compiled form is internal and is not stored.
+- `pattern` (optional): the advanced compiled-group form (§5.3). When present, it is used for matching instead of `line`, and `line` is kept only for display.
+- The engine compiles each hand into a pattern of groups; apart from an advanced `pattern`, the compiled form is internal and is not stored.
 
 ### 5.3 Line notation
 Groups are separated by spaces.
@@ -178,6 +179,8 @@ Edge cases the notation can't express are handled by an **advanced JSON editor**
               { "tile": "n+1", "suit": "A", "count": 3 } ],
   "constraints": { "n": [1, 8] } }
 ```
+
+In this format, `tile` is a digit 1–9, a number variable (one lowercase letter, with an optional `+k` or `-k`), or `0`, `F`, `N`, `E`, `W`, `S`, `D`. Numbers and `D` need a `suit` variable, and different suit variables mean different suits. Number variables range over 1–9 unless `constraints` narrows them, and instantiations with a rank outside 1–9 are dropped.
 
 The notation is the primary input; the compiled-group format is the fallback.
 
