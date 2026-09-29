@@ -16,7 +16,7 @@ A static, single-player practice site for **American (NMJL-style) mah jongg**: t
 - Tiles are integer ids (see SPEC §3). Hands are count arrays where practical.
 
 ## Commands
-- Run tests: `node --test test/`
+- Run tests: `node --test` (finds `test/*.test.js`; on Node 22 a bare `test/` argument is treated as a file and fails)
 - Local preview: `python3 -m http.server 8000`, then open http://localhost:8000. Opening `file://` directly breaks ES module imports.
 - Deploy: push to `main`. GitHub Pages serves from the repo root on `main`.
 
