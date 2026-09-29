@@ -77,6 +77,7 @@ AI opponents decide whether to stop the second Charleston (§9). The UI offers t
 - A discard may be called only:
   - to complete an **exposure** of 3 or more identical tiles (pung, kong, quint, sextet), which the caller then places face up, jokers allowed; or
   - to complete **Mah Jongg**. This is the only time a discard can be taken to complete a pair or single.
+- The engine offers an exposure call only when the new exposure, together with the caller's earlier exposures, still fits at least one exposed hand on the loaded card. A call that fits nothing would make the hand dead at once (§4.7), so it is never offered.
 - There are no chows (runs are never called).
 - A discarded joker can't be called.
 - **Priority:** a Mah Jongg call beats an exposure call. Between two exposure calls, the player next in turn after the discarder wins. Between two Mah Jongg calls, also the player next in turn. **[verify]**

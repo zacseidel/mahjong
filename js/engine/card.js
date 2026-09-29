@@ -298,25 +298,36 @@ export function expandCard(card) {
 }
 
 /**
- * Does a complete hand match this target? Exposures must equal target groups exactly
- * (same tile, same size); concealed tiles fill the rest, with jokers only in groups.
- * A concealed target can't have exposures.
+ * Fit exposures into a target's groups. Each exposure must equal a distinct target group
+ * (same tile, same size); a concealed target takes no exposures.
+ * @param {Target} target
+ * @param {Exposure[]} exposures
+ * @returns {Int8Array|null}  Per-tile group counts left for concealed tiles, or null if they don't fit.
+ */
+export function fitExposures(target, exposures) {
+  if (target.concealed && exposures.length) return null;
+  const group = Int8Array.from(target.group);
+  const unused = target.groups.slice();
+  for (const e of exposures) {
+    const i = unused.findIndex((g) => g.tile === e.tile && g.count === e.count);
+    if (i < 0) return null;
+    unused.splice(i, 1);
+    group[e.tile] -= e.count;
+  }
+  return group;
+}
+
+/**
+ * Does a complete hand match this target? Exposures must fit (see fitExposures);
+ * concealed tiles fill the rest, with jokers only in groups.
  * @param {Target} target
  * @param {{concealed: number[], exposures?: Exposure[]}} hand
  * @returns {boolean}
  */
 export function matchTarget(target, { concealed, exposures = [] }) {
-  if (target.concealed && exposures.length) return false;
-  const group = Int8Array.from(target.group);
-  const unused = target.groups.slice();
-  let total = concealed.length;
-  for (const e of exposures) {
-    const i = unused.findIndex((g) => g.tile === e.tile && g.count === e.count);
-    if (i < 0) return false;
-    unused.splice(i, 1);
-    group[e.tile] -= e.count;
-    total += e.count;
-  }
+  const group = fitExposures(target, exposures);
+  if (!group) return false;
+  const total = exposures.reduce((n, e) => n + e.count, concealed.length);
   if (total !== HAND_SIZE) return false;
   const counts = toCounts(concealed);
   for (let t = 0; t < KINDS; t++) {
