@@ -9,11 +9,9 @@ export const LEVEL_NAMES = Object.freeze(['beginner', 'intermediate']);
 export const POINT_MODES = Object.freeze(['points', 'dollars', 'both']);
 
 /**
- * Defaults. Tips are on for a first-time player and off for a returning one (SPEC §10), unless
- * the player has chosen (tipsChosen).
- * @param {{returning?: boolean}} [options]
+ * Defaults. Tips are on by default (SPEC §10); a player's own on/off choice (tipsChosen) is kept.
  */
-export function defaultSettings({ returning = false } = {}) {
+export function defaultSettings() {
   return {
     schema: SETTINGS_SCHEMA,
     humanSeat: 1,
@@ -21,7 +19,7 @@ export function defaultSettings({ returning = false } = {}) {
     speed: 'normal',
     trainingWheels: true,
     rules: {},
-    tips: { offense: !returning, defense: !returning },
+    tips: { offense: true, defense: true },
     tipsChosen: false,
     points: 'points',
   };
@@ -32,10 +30,9 @@ const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fa
 /**
  * Merge saved settings onto the defaults, keeping only valid values. Unknown keys are dropped.
  * @param {unknown} raw  What was saved (may be anything).
- * @param {{returning?: boolean}} [options]
  */
-export function normalizeSettings(raw, { returning = false } = {}) {
-  const d = defaultSettings({ returning });
+export function normalizeSettings(raw) {
+  const d = defaultSettings();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.schema !== SETTINGS_SCHEMA) return d;
   const out = { ...d };
   if (Number.isInteger(raw.humanSeat) && raw.humanSeat >= 0 && raw.humanSeat <= 3) out.humanSeat = raw.humanSeat;

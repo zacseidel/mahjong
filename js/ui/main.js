@@ -7,7 +7,7 @@ import { renderOpponent, renderCenter, renderMyExposures } from './table.js';
 import { renderPrompt } from './prompt.js';
 import { showEndOfHand, showCard, showSettings, showOpponent, openModal, closeModal } from './modals.js';
 import { nameOf, windOf } from './format.js';
-import { loadCards, saveCards, loadSettings, saveSettings, loadFlags, setFlag, loadLedger, saveLedger } from '../storage.js';
+import { loadCards, saveCards, loadSettings, saveSettings, loadLedger, saveLedger } from '../storage.js';
 import { makeRecord, appendRecord } from '../ledger.js';
 import { PRACTICE_ID, getCard, setActive, putCard, importCard, playableHands } from '../cardStore.js';
 
@@ -235,10 +235,7 @@ function showNoCard(problem) {
 
 function begin(card, cardId = loadCards().activeId) {
   app.replaceChildren(layout.top, layout.left, layout.center, layout.right, layout.me, layout.side);
-  // Tips default on for a first visit and off for a returning player, unless chosen (SPEC §10).
-  const returning = !!loadFlags().visited;
-  settings = loadSettings({ returning });
-  setFlag('visited');
+  settings = loadSettings();
   session = new Session({ card, settings, onChange: render, onEnd });
   session.cardId = cardId;
   buildTopbar();

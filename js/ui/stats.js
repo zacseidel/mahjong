@@ -3,12 +3,12 @@
 import { h, mount, button } from './dom.js';
 import { openModal, closeModal } from './modals.js';
 import { formatPoints } from './format.js';
-import { loadLedger, clearLedger, loadSettings, loadFlags, storageAvailable } from '../storage.js';
+import { loadLedger, clearLedger, loadSettings, storageAvailable } from '../storage.js';
 import { computeStats, sessions, toCSV } from '../ledger.js';
 
 const root = document.getElementById('stats');
 const POSITIONS = ['You', 'Right', 'Across', 'Left'];
-const mode = loadSettings({ returning: !!loadFlags().visited }).points;
+const mode = loadSettings().points;
 
 const pct = (x) => (x === null ? '—' : `${Math.round(x * 100)}%`);
 const num = (x) => (x === null ? '—' : x.toFixed(1).replace(/\.0$/, ''));

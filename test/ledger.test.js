@@ -103,16 +103,15 @@ test('normalizeLedger drops malformed records', () => {
 
 // ---------- Settings ----------
 
-test('tips default on for a first visit, off for a returning player', () => {
+test('tips are on by default; only a player’s own choice turns them off', () => {
   assert.deepEqual(defaultSettings().tips, { offense: true, defense: true });
-  assert.deepEqual(defaultSettings({ returning: true }).tips, { offense: false, defense: false });
-  // Saved but never chosen: the default for this visit applies.
-  const saved = { ...defaultSettings(), speed: 'fast' };
-  assert.deepEqual(normalizeSettings(saved, { returning: true }).tips, { offense: false, defense: false });
-  assert.equal(normalizeSettings(saved, { returning: true }).speed, 'fast');
-  // Chosen: the choice sticks.
+  // Saved without an explicit choice: tips stay on.
+  const saved = { ...defaultSettings(), speed: 'fast', tips: { offense: false, defense: false } };
+  assert.deepEqual(normalizeSettings(saved).tips, { offense: true, defense: true });
+  assert.equal(normalizeSettings(saved).speed, 'fast');
+  // Chosen: the choice sticks across visits.
   const chosen = { ...defaultSettings(), tips: { offense: true, defense: false }, tipsChosen: true };
-  assert.deepEqual(normalizeSettings(chosen, { returning: true }).tips, { offense: true, defense: false });
+  assert.deepEqual(normalizeSettings(chosen).tips, { offense: true, defense: false });
 });
 
 test('normalizeSettings keeps valid values and drops the rest', () => {

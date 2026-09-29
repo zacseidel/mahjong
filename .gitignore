@@ -1,0 +1,19 @@
+# Photos and scans (for example of a purchased card) must never be committed: the repo is
+# public on GitHub Pages, and official card data may not be in it (CLAUDE.md hard rule 1).
+*.heic
+*.HEIC
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.png
+*.PNG
+*.pdf
+*.PDF
+
+# Exported card files and hand histories belong to the user, not the repo.
+*.csv
+/*.json
+!/package.json
+
+.DS_Store

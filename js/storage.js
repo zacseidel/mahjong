@@ -76,12 +76,9 @@ export function setFlag(name, value = true) {
   return writeJSON(KEYS.flags, { ...loadFlags(), [name]: value });
 }
 
-/**
- * Saved settings merged onto the defaults. A returning player (one who has visited before) gets
- * tips off by default unless they chose otherwise.
- */
-export function loadSettings({ returning = false } = {}) {
-  return normalizeSettings(readJSON(KEYS.settings, null), { returning });
+/** Saved settings merged onto the defaults. */
+export function loadSettings() {
+  return normalizeSettings(readJSON(KEYS.settings, null));
 }
 
 export function saveSettings(settings) {

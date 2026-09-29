@@ -77,7 +77,7 @@ test('settings and ledger round-trip, and fall back when storage is unavailable'
   withStorage({ value: fakeStorage() }, () => {
     const settings = { ...defaultSettings(), speed: 'slow', tips: { offense: false, defense: true }, tipsChosen: true };
     assert.equal(saveSettings(settings), true);
-    assert.deepEqual(loadSettings({ returning: true }), settings);
+    assert.deepEqual(loadSettings(), settings);
     const ledger = { schema: 1, records: [{ timestamp: 't', payments: [0, 0, 0, 0], human: 1 }] };
     assert.equal(saveLedger(ledger), true);
     assert.deepEqual(loadLedger(), ledger);

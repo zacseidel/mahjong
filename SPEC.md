@@ -309,7 +309,7 @@ Intermediate plus defense: reads opponents with §10, folds when appropriate, av
 
 ## 10. Tips (toggleable)
 
-Tips are off by default for a returning player and on by default for a first-time player. A returning player is one who has visited before (flag `visited` in `mj.flags.v1`). Once the player turns tips on or off themselves (`tipsChosen`), that choice is saved and always wins. Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
+Tips are **on by default** for every player, first-time or returning (decided with the project owner; this replaces the earlier "off for returning players" rule). Once the player turns tips on or off themselves (`tipsChosen`), that choice is saved and always wins. Offense and defense tips can be toggled separately. Each tip shows a one-line reason; tapping it expands the explanation.
 
 ### 10.1 Offense tips
 - **Closest hands:** the top 3 targets with distance, value, and the tiles still needed. Tap one to highlight the tiles in your rack it uses.
